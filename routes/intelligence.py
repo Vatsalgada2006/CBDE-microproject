@@ -157,3 +157,81 @@ def get_dashboard_data():
     }
 
     return jsonify(dashboard_data), 200
+
+@intelligence_bp.route('/summarize/<doc_id>', methods=['GET'])
+@token_required
+def summarize_document(doc_id):
+    """
+    Generate a summary of a document.
+    """
+    # Verify that the document exists and the user has access
+    document_service = get_document_service()
+    document = document_service.get_document(doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Check access
+    from routes.documents import check_document_access
+    if not check_document_access(document, request.user['uid']):
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Generate summary
+    intelligence_service = get_intelligence_service()
+    summary = intelligence_service.summarize_document(doc_id)
+
+    return jsonify({'summary': summary}), 200
+
+@intelligence_bp.route('/search', methods=['POST'])
+@token_required
+def semantic_search():
+    """
+    Perform semantic search on documents.
+    """
+    data = request.get_json()
+    if not data or 'query' not in data:
+        return jsonify({'error': 'Query is required'}), 400
+
+    query = data['query']
+    user_id = request.user['uid']
+
+    # Perform semantic search
+    intelligence_service = get_intelligence_service()
+    results = intelligence_service.semantic_search(query, user_id)
+
+    # Format results
+    formatted_results = []
+    for result in results:
+        doc = result['document']
+        formatted_results.append({
+            'doc_id': doc.doc_id,
+            'filename': doc.filename,
+            'similarity': result['similarity'],
+            'content_type': doc.content_type,
+            'size': doc.size,
+            'CreatedAt': doc.CreatedAt
+        })
+
+    return jsonify({'results': formatted_results}), 200
+
+@intelligence_bp.route('/insights/<doc_id>', methods=['GET'])
+@token_required
+def get_document_insights(doc_id):
+    """
+    Get insights for a document.
+    """
+    # Verify that the document exists and the user has access
+    document_service = get_document_service()
+    document = document_service.get_document(doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Check access
+    from routes.documents import check_document_access
+    if not check_document_access(document, request.user['uid']):
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Get insights
+    intelligence_service = get_intelligence_service()
+    insights = intelligence_service.get_document_insights(doc_id)
+
+    return jsonify(insights), 200

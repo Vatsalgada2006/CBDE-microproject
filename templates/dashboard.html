@@ -20,35 +20,35 @@
     {% endif %}
 {% endwith %}
 
-<!-- Stats Cards -->
+<!-- Stats Cards with 3D Effect -->
 <div class="grid grid-4 mb-6 fade-in fade-in-delay-3">
-    <div class="stat-card">
+    <div class="stat-card card-3d">
         <div class="stat-icon">
-            <i class="fas fa-file-alt"></i>
+            <i class="fas fa-file-alt holographic"></i>
         </div>
         <div class="stat-value" id="total-docs">-</div>
         <div class="stat-label">Total Documents</div>
     </div>
 
-    <div class="stat-card">
+    <div class="stat-card card-3d">
         <div class="stat-icon">
-            <i class="fas fa-hdd"></i>
+            <i class="fas fa-hdd holographic"></i>
         </div>
         <div class="stat-value" id="total-size">-</div>
         <div class="stat-label">Storage Used</div>
     </div>
 
-    <div class="stat-card">
+    <div class="stat-card card-3d">
         <div class="stat-icon">
-            <i class="fas fa-robot"></i>
+            <i class="fas fa-robot holographic"></i>
         </div>
         <div class="stat-value" id="ai-processed">-</div>
         <div class="stat-label">AI Processed</div>
     </div>
 
-    <div class="stat-card">
+    <div class="stat-card card-3d">
         <div class="stat-icon">
-            <i class="fas fa-share-alt"></i>
+            <i class="fas fa-share-alt holographic"></i>
         </div>
         <div class="stat-value" id="shared-docs">-</div>
         <div class="stat-label">Shared Documents</div>
@@ -58,7 +58,7 @@
 <!-- Charts and Visualizations -->
 <div class="grid grid-2 mb-6">
     <!-- Extraction Status Chart -->
-    <div class="card fade-in fade-in-delay-4">
+    <div class="card card-3d fade-in fade-in-delay-4">
         <div class="card-header">
             <h2><i class="fas fa-file-import"></i> Extraction Status</h2>
         </div>
@@ -70,7 +70,7 @@
     </div>
 
     <!-- Intelligence Status Chart -->
-    <div class="card fade-in fade-in-delay-5">
+    <div class="card card-3d fade-in fade-in-delay-5">
         <div class="card-header">
             <h2><i class="fas fa-brain"></i> Intelligence Status</h2>
         </div>
@@ -85,7 +85,7 @@
 <!-- Recent Activity and Top Categories -->
 <div class="grid grid-2 mb-6">
     <!-- Recent Documents -->
-    <div class="card fade-in fade-in-delay-6">
+    <div class="card card-3d fade-in fade-in-delay-6">
         <div class="card-header">
             <h2><i class="fas fa-clock"></i> Recent Activity</h2>
         </div>
@@ -97,7 +97,7 @@
     </div>
 
     <!-- Document Categories -->
-    <div class="card fade-in fade-in-delay-7">
+    <div class="card card-3d fade-in fade-in-delay-7">
         <div class="card-header">
             <h2><i class="fas fa-tags"></i> Document Categories</h2>
         </div>
@@ -112,7 +112,7 @@
 <!-- Action Items and Insights -->
 <div class="grid grid-2">
     <!-- Action Items -->
-    <div class="card fade-in fade-in-delay-8">
+    <div class="card card-3d fade-in fade-in-delay-8">
         <div class="card-header">
             <h2><i class="fas fa-tasks"></i> Action Items</h2>
         </div>
@@ -124,7 +124,7 @@
     </div>
 
     <!-- Insights and Recommendations -->
-    <div class="card fade-in fade-in-delay-9">
+    <div class="card card-3d fade-in fade-in-delay-9">
         <div class="card-header">
             <h2><i class="fas fa-lightbulb"></i> Insights & Recommendations</h2>
         </div>
@@ -200,7 +200,12 @@
         const ctx = document.getElementById('extractionStatusChart');
         if (!ctx) return;
 
-        new Chart(ctx, {
+        // Destroy previous chart if exists
+        if (window.extractionChart instanceof Chart) {
+            window.extractionChart.destroy();
+        }
+
+        window.extractionChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: Object.keys(data),
@@ -245,7 +250,12 @@
         const ctx = document.getElementById('intelligenceChart');
         if (!ctx) return;
 
-        new Chart(ctx, {
+        // Destroy previous chart if exists
+        if (window.intelligenceChart instanceof Chart) {
+            window.intelligenceChart.destroy();
+        }
+
+        window.intelligenceChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: Object.keys(data),
@@ -302,7 +312,12 @@
             return;
         }
 
-        new Chart(ctx, {
+        // Destroy previous chart if exists
+        if (window.categoriesChart instanceof Chart) {
+            window.categoriesChart.destroy();
+        }
+
+        window.categoriesChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: Object.keys(data),

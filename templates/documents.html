@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="page-header fade-in fade-in-delay-1">
-    <h1><i class="fas fa-folder-open"></i> Documents</h1>
+    <h1><i class="fas fa-folder-open holographic"></i> Documents</h1>
     <p>Manage and organize your intelligent document collection</p>
 </div>
 
@@ -338,9 +338,10 @@
         const fileIcon = getFileIcon(doc.content_type || doc.filename);
         const fileColor = getFileColor(doc.content_type || doc.filename);
         const statusClass = getStatusClass(doc.intelligence_status);
+        const processingProgress = doc.processing_progress || 0;
 
         return `
-            <div class="document-card bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors cursor-pointer" data-doc-id="${doc.doc_id}">
+            <div class="document-card bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors cursor-pointer card-3d" data-doc-id="${doc.doc_id}">
                 <div class="flex items-start p-4">
                     <!-- File Icon -->
                     <div class="flex-shrink-0">
@@ -386,9 +387,9 @@
                         </div>
 
                         <!-- Progress bar for processing -->
-                        ${doc.processing_progress ? `
+                        ${processingProgress ? `
                             <div class="mt-2 h-1 bg-gray-700 rounded-full overflow-hidden">
-                                <div class="h-full bg-indigo-500" style="width: ${doc.processing_progress}%"></div>
+                                <div class="h-full bg-indigo-500" style="width: ${processingProgress}%"></div>
                             </div>
                         ` : ''}
                     </div>

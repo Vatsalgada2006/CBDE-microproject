@@ -263,3 +263,82 @@ class IntelligenceService:
         # For now, we'll leave it as None
 
         return intelligence
+
+    def summarize_document(self, document_id: str) -> str:
+        """
+        Generate a summary of the document using AI.
+        This is a placeholder implementation - in a real app, this would use an LLM.
+        """
+        try:
+            # Get document
+            doc_ref = self.db.collection('documents').document(document_id)
+            doc_data = doc_ref.get()
+            if not doc_data.exists:
+                return "Document not found"
+
+            # In a real implementation, we would fetch the extracted text and use an LLM to summarize it
+            # For now, we'll return a placeholder summary
+            return f"Summary of {doc_data.get('filename', 'document')}: This document contains important information that has been processed by our AI system. Key topics include document processing, information extraction, and intelligent document management."
+        except Exception as e:
+            logger.error(f"Error summarizing document {document_id}: {e}")
+            return "Unable to generate summary"
+
+    def semantic_search(self, query: str, owner_id: str, limit: int = 10) -> List[Dict]:
+        """
+        Perform semantic search on documents using embeddings.
+        """
+        try:
+            # Generate embedding for the query
+            query_embedding = self.embedding_service.generate_embedding(query)
+            if query_embedding is None:
+                return []
+
+            # Get documents for the owner
+            docs = self._get_existing_documents(owner_id, limit=100)  # Get more docs to search through
+
+            # Calculate similarities
+            results = []
+            for doc in docs:
+                if doc.embedding:
+                    # Calculate cosine similarity
+                    similarity = np.dot(query_embedding, doc.embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(doc.embedding))
+                    results.append({
+                        'document': doc,
+                        'similarity': float(similarity)
+                    })
+
+            # Sort by similarity and return top results
+            results.sort(key=lambda x: x['similarity'], reverse=True)
+            return results[:limit]
+        except Exception as e:
+            logger.error(f"Error performing semantic search: {e}")
+            return []
+
+    def get_document_insights(self, document_id: str) -> Dict:
+        """
+        Generate insights for a document.
+        """
+        try:
+            # Get document
+            doc_ref = self.db.collection('documents').document(document_id)
+            doc_data = doc_ref.get()
+            if not doc_data.exists:
+                return {}
+
+            doc = Document.from_dict(doc_data.to_dict())
+
+            # Generate insights
+            insights = {
+                'summary': self.summarize_document(document_id),
+                'word_count': len(doc_data.get('extracted_text', '').split()) if doc_data.get('extracted_text') else 0,
+                'processing_time': 'N/A',  # In a real app, we would track this
+                'key_topics': ['Document Processing', 'Information Extraction', 'AI Analysis'],  # Placeholder
+                'readability_score': 8.5,  # Placeholder
+                'sentiment': 'neutral',  # Placeholder
+                'language': 'en'  # Placeholder
+            }
+
+            return insights
+        except Exception as e:
+            logger.error(f"Error generating insights for document {document_id}: {e}")
+            return {}

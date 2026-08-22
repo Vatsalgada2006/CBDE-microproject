@@ -245,10 +245,54 @@ def list_documents():
     List documents for the current user (API endpoint).
     """
     owner_id = request.user['uid']
-    documents = document_service.list_documents_by_owner(owner_id)
-    return jsonify({
-        'documents': [doc.to_dict() for doc in documents]
-    }), 200
+
+    # Get query parameters
+    search_query = request.args.get('search', '')
+    file_type = request.args.get('type', 'all')
+    sort_by = request.args.get('sort', 'date_desc')
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 12))
+
+    # Get documents with filtering and pagination
+    result = document_service.list_documents_by_owner_with_filters(
+        owner_id,
+        search_query=search_query,
+        file_type=file_type,
+        sort_by=sort_by,
+        page=page,
+        limit=limit
+    )
+
+    return jsonify(result), 200
+
+@documents_bp.route('/<doc_id>/share', methods=['POST'])
+@token_required
+def share_document(doc_id):
+    """
+    Share a document with another user.
+    """
+    document = document_service.get_document(doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Check if the current user has access to the document
+    if not check_document_access(document, request.user['uid']):
+        return jsonify({'error': 'Access denied'}), 403
+
+    data = request.get_json()
+    if not data or 'email' not in data:
+        return jsonify({'error': 'Email is required'}), 400
+
+    email = data['email']
+    permission = data.get('permission', 'view')  # view, comment, edit
+
+    # Share the document
+    try:
+        share_service.share_document(document.doc_id, request.user['uid'], email, permission)
+        return jsonify({'message': 'Document shared successfully'}), 200
+    except Exception as e:
+        print(f"Error sharing document: {e}")
+        return jsonify({'error': 'Failed to share document'}), 500
 
 # HTML Rendering Routes
 @documents_bp.route('/view', methods=['GET'])
