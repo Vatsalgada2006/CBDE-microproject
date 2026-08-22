@@ -2,6 +2,7 @@ import os
 import firebase_admin
 from firebase_admin import credentials
 import uuid
+from datetime import datetime
 from config import Config
 
 # Mock auth methods for when Firebase is not initialized

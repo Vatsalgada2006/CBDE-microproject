@@ -6,10 +6,16 @@ from routes.folders import folders_bp
 from routes.sharing import sharing_bp
 from routes.intelligence import intelligence_bp
 from services.firebase_service import initialize_demo_data
+from datetime import datetime
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # Make datetime.now available to all templates
+    @app.context_processor
+    def inject_now():
+        return {'now': datetime.utcnow}
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/auth')
