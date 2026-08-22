@@ -22,7 +22,7 @@
     /* UI Element Colors */
     --surface: rgba(15, 25, 45, 0.7);       /* Glass surface */
     --surface-light: rgba(25, 35, 65, 0.6); /* Lighter glass */
-    -- border: rgba(79, 70, 229, 0.2);      /* Subtle border */
+    --border: rgba(79, 70, 229, 0.2);      /* Subtle border */
     --highlight: rgba(123, 63, 255, 0.3);   /* Purple highlight */
 
     /* Text Colors */
