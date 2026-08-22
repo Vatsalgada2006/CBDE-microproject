@@ -23,6 +23,8 @@ def create_app():
 
     return app
 
+# Create global app instance for gunicorn compatibility
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
     app.run(debug=True, port=5001)
