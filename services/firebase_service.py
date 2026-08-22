@@ -140,8 +140,8 @@ def initialize_firebase():
             cred = credentials.Certificate({
                 "type": "service_account",
                 "project_id": Config.FIREBASE_PROJECT_ID,
-                "private_key_id": "",
-                "private_key": Config.FIREBASE_PRIVATE_KEY.replace('\n', '\n') if Config.FIREBASE_PRIVATE_KEY else "",
+                "private_key_id": Config.FIREBASE_PRIVATE_KEY_ID or "",
+                "private_key": Config.FIREBASE_PRIVATE_KEY.replace('\\n', '\n') if Config.FIREBASE_PRIVATE_KEY else "",
                 "client_email": Config.FIREBASE_CLIENT_EMAIL,
                 "client_id": "",
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
