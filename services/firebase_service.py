@@ -1,6 +1,6 @@
 import os
 import firebase_admin
-from firebase_admin import credentials
+from firebase_admin import auth, credentials, firestore, storage
 import uuid
 from datetime import datetime
 from config import Config
@@ -160,8 +160,6 @@ def initialize_firebase():
 # Initialize Firebase when this module is loaded
 initialize_firebase()
 
-# Import auth from firebase_admin after defining MockAuth so we can replace it if needed
-from firebase_admin import auth
 
 # If Firebase is not initialized, replace the auth module with our mock
 if not _firebase_initialized:
@@ -172,9 +170,8 @@ else:
 
 # Initialize Firestore and Storage clients or mocks
 if _firebase_initialized:
-    from firebase_admin import firestore
     firestore_db = firestore.client()
-    storage_bucket = firebase_admin.storage.bucket()
+    storage_bucket = storage.bucket()
 else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
