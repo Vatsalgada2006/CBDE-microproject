@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, render_template
 from services.firebase_service import auth
 from services.document_service import DocumentService
 from services.storage_service import StorageService
@@ -28,6 +28,7 @@ def check_document_access(document, user_id):
         return True
     return False
 
+# API Routes (unchanged)
 @documents_bp.route('/upload', methods=['POST'])
 @token_required
 def upload_document():
@@ -126,16 +127,16 @@ def upload_document():
 @token_required
 def get_document(doc_id):
     """
-    Get document metadata by ID.
+    Get document metadata by ID (API endpoint).
     """
     document = document_service.get_document(doc_id)
     if not document:
         return jsonify({'error': 'Document not found'}), 404
-    
+
     # Check if the current user has access to the document
     if not check_document_access(document, request.user['uid']):
         return jsonify({'error': 'Access denied'}), 403
-    
+
     return jsonify({'document': document.to_dict()}), 200
 
 @documents_bp.route('/<doc_id>/download', methods=['GET'])
@@ -147,11 +148,11 @@ def download_document(doc_id):
     document = document_service.get_document(doc_id)
     if not document:
         return jsonify({'error': 'Document not found'}), 404
-    
+
     # Check if the current user has access to the document
     if not check_document_access(document, request.user['uid']):
         return jsonify({'error': 'Access denied'}), 403
-    
+
     # Download the file from storage
     try:
         blob = storage_service.bucket.blob(document.storage_path)
@@ -159,7 +160,7 @@ def download_document(doc_id):
     except Exception as e:
         print(f"Error downloading file from storage: {e}")
         return jsonify({'error': 'Failed to download file'}), 500
-    
+
     # Return the file as a downloadable response
     return send_file(
         io.BytesIO(file_data),
@@ -178,29 +179,29 @@ def update_document(doc_id):
     document = document_service.get_document(doc_id)
     if not document:
         return jsonify({'error': 'Document not found'}), 404
-    
+
     # Check if the current user has access to the document
     if not check_document_access(document, request.user['uid']):
         return jsonify({'error': 'Access denied'}), 403
-    
+
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
-    
+
     # Update allowed fields
     allowed_fields = ['filename', 'tags', 'folder_id']
     for field in allowed_fields:
         if field in data:
             setattr(document, field, data[field])
-    
+
     document.UpdatedAt = datetime.utcnow()
-    
+
     try:
         document = document_service.update_document(document)
     except Exception as e:
         print(f"Error updating document: {e}")
         return jsonify({'error': 'Failed to update document'}), 500
-    
+
     return jsonify({
         'message': 'Document updated successfully',
         'document': document.to_dict()
@@ -215,11 +216,11 @@ def delete_document(doc_id):
     document = document_service.get_document(doc_id)
     if not document:
         return jsonify({'error': 'Document not found'}), 404
-    
+
     # Check if the current user has access to the document
     if not check_document_access(document, request.user['uid']):
         return jsonify({'error': 'Access denied'}), 403
-    
+
     # Delete the file from storage
     try:
         storage_service.delete_file(document.storage_path)
@@ -227,24 +228,58 @@ def delete_document(doc_id):
         print(f"Error deleting file from storage: {e}")
         # We might still want to delete the metadata, but log the error
         pass
-    
+
     # Delete the document metadata from Firestore
     try:
         document_service.delete_document(doc_id)
     except Exception as e:
         print(f"Error deleting document metadata: {e}")
         return jsonify({'error': 'Failed to delete document metadata'}), 500
-    
+
     return jsonify({'message': 'Document deleted successfully'}), 200
 
 @documents_bp.route('', methods=['GET'])
 @token_required
 def list_documents():
     """
-    List documents for the current user.
+    List documents for the current user (API endpoint).
     """
     owner_id = request.user['uid']
     documents = document_service.list_documents_by_owner(owner_id)
     return jsonify({
         'documents': [doc.to_dict() for doc in documents]
     }), 200
+
+# HTML Rendering Routes
+@documents_bp.route('/view', methods=['GET'])
+@token_required
+def documents_page():
+    """
+    Render the documents list HTML page.
+    """
+    return render_template('documents.html')
+
+@documents_bp.route('/view/<doc_id>', methods=['GET'])
+@token_required
+def document_view_page(doc_id):
+    """
+    Render the document view HTML page.
+    """
+    # Verify that the document exists and the user has access
+    document = document_service.get_document(doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Check access (using the same check as in documents route)
+    if not check_document_access(document, request.user['uid']):
+        return jsonify({'error': 'Access denied'}), 403
+
+    return render_template('document-view.html')
+
+@documents_bp.route('/upload/form', methods=['GET'])
+@token_required
+def upload_form_page():
+    """
+    Render the document upload form HTML page.
+    """
+    return render_template('upload.html')

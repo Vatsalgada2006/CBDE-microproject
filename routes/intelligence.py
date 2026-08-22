@@ -35,6 +35,42 @@ def get_intelligence(doc_id):
     intelligence_data = intelligence_service.get_document_intelligence(doc_id)
     return jsonify(intelligence_data), 200
 
+@intelligence_bp.route('/document/<doc_id>/data', methods=['GET'])
+@token_required
+def get_document_intelligence_data(doc_id):
+    """
+    Get formatted intelligence data for document view page.
+    """
+    # Verify that the document exists and the user has access
+    document_service = get_document_service()
+    document = document_service.get_document(doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Check access
+    from routes.documents import check_document_access
+    if not check_document_access(document, request.user['uid']):
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Get intelligence data
+    intelligence_service = get_intelligence_service()
+    intelligence_data = intelligence_service.get_document_intelligence(doc_id)
+
+    # Format the data for the document view page
+    formatted_data = {
+        'actions': intelligence_data.get('actions', []),
+        'relationships': intelligence_data.get('relationships', []),
+        'classification': intelligence_data.get('classification', {}),
+        'versions': []  # We'll extract versions from relationships if needed
+    }
+
+    # Extract version-like relationships
+    relationships = intelligence_data.get('relationships', [])
+    version_relationships = [rel for rel in relationships if rel.get('relationship_type', '').startswith('version')]
+    formatted_data['versions'] = version_relationships
+
+    return jsonify(formatted_data), 200
+
 @intelligence_bp.route('/<doc_id>/reprocess', methods=['POST'])
 @token_required
 def reprocess_intelligence(doc_id):

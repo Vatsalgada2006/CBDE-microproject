@@ -178,7 +178,86 @@ else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
 
-# Verify Firebase ID token
+def initialize_demo_data():
+    """Initialize demo data for presentation purposes when using mock Firebase."""
+    # Only initialize demo data if we're using mock Firebase
+    if _firebase_initialized:
+        return  # Skip demo data initialization if using real Firebase
+
+    try:
+        # Import Document model
+        from models.document import Document
+
+        # Create sample documents
+        sample_docs = [
+            {
+                "filename": "sample_contract.pdf",
+                "content_type": "application/pdf",
+                "size": 102400,  # 100KB
+                "storage_path": "uploads/sample_contract.pdf",
+                "hash": "a" * 64,  # dummy hash
+                "extraction_status": "completed",
+                "intelligence_status": "completed",
+                "embedding": [0.1] * 384,  # dummy embedding (384 dims for all-MiniLM-L6-v2)
+                "CreatedAt": datetime.utcnow(),
+                "UpdatedAt": datetime.utcnow()
+            },
+            {
+                "filename": "project_proposal.docx",
+                "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "size": 204800,  # 200KB
+                "storage_path": "uploads/project_proposal.docx",
+                "hash": "b" * 64,  # dummy hash
+                "extraction_status": "completed",
+                "intelligence_status": "completed",
+                "embedding": [0.2] * 384,  # dummy embedding
+                "CreatedAt": datetime.utcnow(),
+                "UpdatedAt": datetime.utcnow()
+            },
+            {
+                "filename": "meeting_notes.txt",
+                "content_type": "text/plain",
+                "size": 5120,  # 5KB
+                "storage_path": "uploads/meeting_notes.txt",
+                "hash": "c" * 64,  # dummy hash
+                "extraction_status": "completed",
+                "intelligence_status": "completed",
+                "embedding": [0.3] * 384,  # dummy embedding
+                "CreatedAt": datetime.utcnow(),
+                "UpdatedAt": datetime.utcnow()
+            }
+        ]
+
+        # Insert sample documents
+        for i, doc_data in enumerate(sample_docs):
+            # Create document object
+            document = Document(
+                owner_id="mock_uid",
+                filename=doc_data["filename"],
+                content_type=doc_data["content_type"],
+                size=doc_data["size"],
+                storage_path=doc_data["storage_path"],
+                hash=doc_data["hash"],
+                extraction_status=doc_data["extraction_status"],
+                intelligence_status=doc_data["intelligence_status"],
+                CreatedAt=doc_data["CreatedAt"],
+                UpdatedAt=doc_data["UpdatedAt"]
+            )
+
+            # Set embedding if provided
+            if "embedding" in doc_data:
+                document.embedding = doc_data["embedding"]
+
+            # Save document
+            doc_ref = firestore_db.collection('documents').document()
+            document.doc_id = doc_ref.id
+            doc_ref.set(document.to_dict())
+
+            print(f"Created demo document: {document.doc_id} - {document.filename}")
+
+    except Exception as e:
+        print(f"Error initializing demo data: {e}")
+        # Don't fail the app initialization if demo data fails# Verify Firebase ID token
 def verify_firebase_token(id_token):
     if not _firebase_initialized:
         # Return a mock decoded token for development

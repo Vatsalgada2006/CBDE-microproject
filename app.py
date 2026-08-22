@@ -5,6 +5,7 @@ from routes.documents import documents_bp
 from routes.folders import folders_bp
 from routes.sharing import sharing_bp
 from routes.intelligence import intelligence_bp
+from services.firebase_service import initialize_demo_data
 
 def create_app():
     app = Flask(__name__)
@@ -20,6 +21,9 @@ def create_app():
     @app.route('/')
     def index():
         return render_template('base.html', title='Home')
+
+    # Initialize demo data for presentation
+    initialize_demo_data()
 
     return app
 
