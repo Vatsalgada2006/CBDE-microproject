@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 class IntelligenceService:
     def __init__(self):
         self.extraction_service = ExtractionService()
-        self.embedding_service = EmbeddingService()
+        # Lazy initialization of heavy services
+        self._embedding_service = None
         self.chunking_service = ChunkingService()
         self.action_service = ActionService()
         self.classification_service = ClassificationService()
@@ -31,6 +32,13 @@ class IntelligenceService:
         self.actions_collection = self.db.collection('actions')
         self.relationships_collection = self.db.collection('relationships')
         # We'll store duplicates and versions as relationships with specific types
+
+    @property
+    def embedding_service(self):
+        """Lazy load the embedding service to avoid loading the model at startup."""
+        if self._embedding_service is None:
+            self._embedding_service = EmbeddingService()
+        return self._embedding_service
 
     def process_document(self, document: Document, file_path: str) -> Document:
         """
@@ -58,7 +66,7 @@ class IntelligenceService:
 
         # Step 2: Generate embedding
         document.intelligence_status = "processing"
-        embedding = self.embedding_service.get_embedding(extracted_text)
+        embedding = self.embedding_service.generate_embedding(extracted_text)
         if embedding is not None:
             document.embedding = embedding.tolist()  # Convert numpy array to list for Firestore
             document.intelligence_status = "completed"
@@ -78,7 +86,7 @@ class IntelligenceService:
         # Step 4: Classify the document
         category, confidence = self.classification_service.classify(document, extracted_text)
         # We'll store the classification in the document itself (we could add a field, but for now we'll store in a separate collection or in the document)
-        # Let's add a classification field to the document? We'll store it in a separate collection for simplicity.
+        # We'll add a classification field to the document? We'll store it in a separate collection for simplicity.
         # We'll create a classification collection later. For now, we'll just log it.
         logger.info(f"Document {document.doc_id} classified as {category} with confidence {confidence}")
 
@@ -132,7 +140,7 @@ class IntelligenceService:
             'intelligence_status': document.intelligence_status
         })
 
-    def _get_existing_documents(self, owner_id: str, limit: int = 100) -> List[Document]:
+    def _get_existing_documents(self, owner_id: str, limit: int = 50) -> List[Document]:
         """
         Fetch existing documents for the given owner.
         """

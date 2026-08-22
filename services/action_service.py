@@ -2,16 +2,8 @@ import logging
 import re
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
-import nltk
-from nltk.tokenize import sent_tokenize
 
 logger = logging.getLogger(__name__)
-
-# Download necessary NLTK data if not present
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
 
 class ActionService:
     def __init__(self):
@@ -32,6 +24,23 @@ class ActionService:
             r'\b(?:submit|provide|deliver|complete|finish)\b',
         ]
         self.task_regex = re.compile('|'.join(self.task_patterns), re.IGNORECASE)
+        # Lazy load NLTK tokenizer for sentence tokenization
+        self._sent_tokenize = None
+
+    @property
+    def sent_tokenize(self):
+        """Lazy load NLTK sentence tokenizer."""
+        if self._sent_tokenize is None:
+            try:
+                from nltk.tokenize import sent_tokenize
+            except LookupError:
+                # Download necessary NLTK data if not present
+                import nltk
+                nltk.download('punkt')
+                nltk.download('punkt_tab')
+                from nltk.tokenize import sent_tokenize
+            self._sent_tokenize = sent_tokenize
+        return self._sent_tokenize
 
     def extract_actions(self, text: str) -> List[Dict]:
         """
@@ -46,7 +55,8 @@ class ActionService:
             return []
 
         actions = []
-        sentences = sent_tokenize(text)
+        # Use lazy-loaded sentence tokenizer
+        sentences = self.sent_tokenize(text)
 
         for sentence in sentences:
             sentence = sentence.strip()
@@ -105,7 +115,7 @@ class ActionService:
         """
         if not text:
             return []
-        sentences = sent_tokenize(text)
+        sentences = self.sent_tokenize(text)
         tasks = []
         for sentence in sentences:
             if self.task_regex.search(sentence):

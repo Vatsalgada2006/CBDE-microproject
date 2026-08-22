@@ -1,11 +1,17 @@
 from flask import Blueprint, request, jsonify, render_template
-from services.intelligence_service import IntelligenceService
-from services.document_service import DocumentService
 from routes.auth import token_required
+from datetime import datetime
 
 intelligence_bp = Blueprint('intelligence', __name__)
-intelligence_service = IntelligenceService()
-document_service = DocumentService()
+
+# Lazy initialization of services to avoid loading heavy models at startup
+def get_intelligence_service():
+    from services.intelligence_service import IntelligenceService
+    return IntelligenceService()
+
+def get_document_service():
+    from services.document_service import DocumentService
+    return DocumentService()
 
 @intelligence_bp.route('/<doc_id>', methods=['GET'])
 @token_required
@@ -14,6 +20,7 @@ def get_intelligence(doc_id):
     Get intelligence data for a document.
     """
     # Verify that the document exists and the user has access
+    document_service = get_document_service()
     document = document_service.get_document(doc_id)
     if not document:
         return jsonify({'error': 'Document not found'}), 404
@@ -24,6 +31,7 @@ def get_intelligence(doc_id):
         return jsonify({'error': 'Access denied'}), 403
 
     # Get intelligence data
+    intelligence_service = get_intelligence_service()
     intelligence_data = intelligence_service.get_document_intelligence(doc_id)
     return jsonify(intelligence_data), 200
 
@@ -34,6 +42,7 @@ def reprocess_intelligence(doc_id):
     Re-process a document for intelligence (text extraction, embedding, etc.)
     """
     # Verify that the document exists and the user has access
+    document_service = get_document_service()
     document = document_service.get_document(doc_id)
     if not document:
         return jsonify({'error': 'Document not found'}), 404
@@ -68,6 +77,7 @@ def get_dashboard_data():
     """
     user_id = request.user['uid']
     # Get the user's documents
+    document_service = get_document_service()
     documents = document_service.list_documents_by_owner(user_id)
     total_docs = len(documents)
     total_size = sum(doc.size for doc in documents if doc.size)

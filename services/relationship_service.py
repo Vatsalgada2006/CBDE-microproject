@@ -4,21 +4,8 @@ from typing import List, Tuple, Optional, Set
 from datetime import datetime
 from models.document import Document
 import numpy as np
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
 
 logger = logging.getLogger(__name__)
-
-# Download necessary NLTK data if not present
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
 
 class RelationshipService:
     def __init__(self,
@@ -37,7 +24,23 @@ class RelationshipService:
         self.keyword_weight = keyword_weight
         self.folder_weight = folder_weight
         self.temporal_weight = temporal_weight
-        self.stop_words = set(stopwords.words('english'))
+        # Lazy load NLTK stop words
+        self._stop_words = None
+
+    @property
+    def stop_words(self):
+        """Lazy load NLTK stop words."""
+        if self._stop_words is None:
+            try:
+                from nltk.corpus import stopwords
+                self._stop_words = set(stopwords.words('english'))
+            except LookupError:
+                # Download necessary NLTK data if not present
+                import nltk
+                nltk.download('stopwords')
+                from nltk.corpus import stopwords
+                self._stop_words = set(stopwords.words('english'))
+        return self._stop_words
 
     def _compute_semantic_similarity(self, doc1: Document, doc2: Document) -> float:
         """
@@ -83,6 +86,17 @@ class RelationshipService:
         """
         if not text:
             return set()
+
+        # Lazy load NLTK tokenizer
+        try:
+            from nltk.tokenize import word_tokenize
+        except LookupError:
+            # Download necessary NLTK data if not present
+            import nltk
+            nltk.download('punkt')
+            nltk.download('punkt_tab')
+            from nltk.tokenize import word_tokenize
+
         tokens = word_tokenize(text)
         entities = set()
         for token in tokens:

@@ -2,25 +2,13 @@ import logging
 import re
 from typing import List, Tuple, Optional
 from models.document import Document
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
 
 logger = logging.getLogger(__name__)
 
-# Download necessary NLTK data if not present
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
-
 class ClassificationService:
     def __init__(self):
-        self.stop_words = set(stopwords.words('english'))
+        # Initialize stop words lazily
+        self._stop_words = None
         # Define categories and their associated keywords
         self.categories = {
             'Contract': ['contract', 'agreement', 'party', 'parties', 'obligation', 'liability', 'breach', 'termination', 'effective date', 'governing law'],
@@ -38,12 +26,38 @@ class ClassificationService:
         # Default category
         self.default_category = 'Other'
 
+    @property
+    def stop_words(self):
+        """Lazy load NLTK stop words."""
+        if self._stop_words is None:
+            try:
+                from nltk.corpus import stopwords
+                self._stop_words = set(stopwords.words('english'))
+            except LookupError:
+                # Download necessary NLTK data if not present
+                import nltk
+                nltk.download('stopwords')
+                from nltk.corpus import stopwords
+                self._stop_words = set(stopwords.words('english'))
+        return self._stop_words
+
     def _preprocess_text(self, text: str) -> List[str]:
         """
         Tokenize and remove stop words.
         """
         if not text:
             return []
+        
+        # Lazy load NLTK tokenizer
+        try:
+            from nltk.tokenize import word_tokenize
+        except LookupError:
+            # Download necessary NLTK data if not present
+            import nltk
+            nltk.download('punkt')
+            nltk.download('punkt_tab')
+            from nltk.tokenize import word_tokenize
+        
         tokens = word_tokenize(text.lower())
         # Remove non-alphabetic tokens and stop words
         tokens = [token for token in tokens if token.isalpha() and token not in self.stop_words]
