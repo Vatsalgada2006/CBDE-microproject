@@ -8,6 +8,7 @@ class Config:
     # Firebase configuration
     FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID')
     FIREBASE_CLIENT_EMAIL = os.environ.get('FIREBASE_CLIENT_EMAIL')
+    FIREBASE_CLIENT_ID = os.environ.get('FIREBASE_CLIENT_ID')
     FIREBASE_PRIVATE_KEY = os.environ.get('FIREBASE_PRIVATE_KEY')
     FIREBASE_PRIVATE_KEY_ID = os.environ.get('FIREBASE_PRIVATE_KEY_ID')
     FIREBASE_STORAGE_BUCKET = os.environ.get('FIREBASE_STORAGE_BUCKET')
