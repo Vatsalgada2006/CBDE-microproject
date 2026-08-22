@@ -30,6 +30,13 @@
     --text-secondary: #a8b2d1;      /* Secondary text */
     --text-muted: #6b7280;          /* Muted text */
 
+/* Alert Colors */
+--secondary-color: #16b981;     /* Green - success */
+--accent-color: #f59e0b;        /* Amber/yellow - warning */
+--warning-color: #ef4444;       /* Red - error */
+--info-color: #3b82f6;          /* Blue - info */
+--border-color: rgba(79, 70, 229, 0.2); /* Subtle border */
+
     /* Shadows and Glows */
     --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 8px rgba(0,0,0,0.4);
@@ -448,7 +455,7 @@ nav a.active::after {
     background-color: transparent;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    color: var(--text-color);
+    color: var(--text-primary);
     cursor: pointer;
     transition: var(--transition);
 }
@@ -486,7 +493,7 @@ nav a.active::after {
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem 1.5rem;
-    color: var(--text-color);
+    color: var(--text-primary);
     text-decoration: none;
     transition: var(--transition);
 }
