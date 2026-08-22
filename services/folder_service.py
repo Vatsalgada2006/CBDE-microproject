@@ -1,3 +1,4 @@
+from typing import Optional, List
 from services.firebase_service import firestore_db
 from models.folder import Folder
 from datetime import datetime
