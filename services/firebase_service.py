@@ -258,7 +258,7 @@ def initialize_demo_data():
 
     except Exception as e:
         print(f"Error initializing demo data: {e}")
-        # Don't fail the app initialization if demo data fails# Verify Firebase ID token
+        # Don't fail the app initialization if demo data fails
 def verify_firebase_token(id_token):
     if not _firebase_initialized:
         # Return a mock decoded token for development
