@@ -3,7 +3,7 @@ from services.firebase_service import _firebase_initialized, firestore_db
 from models.document import Document
 from typing import List, Optional, Dict
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Mock Firestore for when Firebase is not initialized
 class MockFirestore:
@@ -115,7 +115,7 @@ class DocumentService:
         """
         Update an existing document.
         """
-        document.UpdatedAt = datetime.utcnow()
+        document.UpdatedAt = datetime.now(timezone.utc)
         doc_ref = self.collection.document(document.doc_id)
         doc_ref.update(document.to_dict())
         return document

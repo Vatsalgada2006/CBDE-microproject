@@ -2,7 +2,7 @@ import os
 import firebase_admin
 from firebase_admin import auth, credentials, firestore, storage
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from config import Config
 
 # Mock auth methods for when Firebase is not initialized
@@ -171,7 +171,7 @@ else:
 # Initialize Firestore and Storage clients or mocks
 if _firebase_initialized:
     firestore_db = firestore.client()
-    storage_bucket = storage.bucket()
+    storage_bucket = storage.bucket(Config.FIREBASE_STORAGE_BUCKET)
 else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
@@ -197,8 +197,8 @@ def initialize_demo_data():
                 "extraction_status": "completed",
                 "intelligence_status": "completed",
                 "embedding": [0.1] * 384,  # dummy embedding (384 dims for all-MiniLM-L6-v2)
-                "CreatedAt": datetime.utcnow(),
-                "UpdatedAt": datetime.utcnow()
+                "CreatedAt": datetime.now(timezone.utc),
+                "UpdatedAt": datetime.now(timezone.utc)
             },
             {
                 "filename": "project_proposal.docx",
@@ -209,8 +209,8 @@ def initialize_demo_data():
                 "extraction_status": "completed",
                 "intelligence_status": "completed",
                 "embedding": [0.2] * 384,  # dummy embedding
-                "CreatedAt": datetime.utcnow(),
-                "UpdatedAt": datetime.utcnow()
+                "CreatedAt": datetime.now(timezone.utc),
+                "UpdatedAt": datetime.now(timezone.utc)
             },
             {
                 "filename": "meeting_notes.txt",
@@ -221,8 +221,8 @@ def initialize_demo_data():
                 "extraction_status": "completed",
                 "intelligence_status": "completed",
                 "embedding": [0.3] * 384,  # dummy embedding
-                "CreatedAt": datetime.utcnow(),
-                "UpdatedAt": datetime.utcnow()
+                "CreatedAt": datetime.now(timezone.utc),
+                "UpdatedAt": datetime.now(timezone.utc)
             }
         ]
 
