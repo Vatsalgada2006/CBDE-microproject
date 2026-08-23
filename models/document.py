@@ -6,7 +6,7 @@ class Document:
                  size=0, storage_path=None, CreatedAt=None, UpdatedAt=None,
                  folder_id=None, tags=None, extraction_status="pending",
                  intelligence_status="pending", hash=None, version=1,
-                 embedding: Optional[List[float]] = None):
+                 embedding: Optional[List[float]] = None, is_favorite=False):
         self.doc_id = doc_id
         self.owner_id = owner_id
         self.filename = filename
@@ -16,12 +16,13 @@ class Document:
         self.CreatedAt = CreatedAt or datetime.utcnow()
         self.UpdatedAt = UpdatedAt or datetime.utcnow()
         self.folder_id = folder_id
-        self.tags = tags or []
+        self.tags = tags or []  # list of tags associated with the document
         self.extraction_status = extraction_status  # pending, processing, completed, failed
         self.intelligence_status = intelligence_status  # pending, processing, completed, failed
         self.hash = hash  # hash of the file for duplicate detection
         self.version = version  # version number for versioning
         self.embedding = embedding  # list of floats representing the document embedding
+        self.is_favorite = is_favorite  # whether the document is marked as favorite
     
     def to_dict(self):
         return {
@@ -39,7 +40,8 @@ class Document:
             'intelligence_status': self.intelligence_status,
             'hash': self.hash,
             'version': self.version,
-            'embedding': self.embedding
+            'embedding': self.embedding,
+            'is_favorite': self.is_favorite
         }
     
     @staticmethod
@@ -59,5 +61,6 @@ class Document:
             intelligence_status=data.get('intelligence_status'),
             hash=data.get('hash'),
             version=data.get('version'),
-            embedding=data.get('embedding')
+            embedding=data.get('embedding'),
+            is_favorite=data.get('is_favorite', False)
         )

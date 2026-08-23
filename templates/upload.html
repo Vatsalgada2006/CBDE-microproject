@@ -150,7 +150,7 @@
             formData.append('file', fileInput.files[0]);
 
             // Submit via fetch
-            fetch('/documents/upload', {
+            authenticatedFetch('/documents/upload', {
                 method: 'POST',
                 body: formData
             })

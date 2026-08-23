@@ -404,7 +404,7 @@
             params.append('sort', sortBy.value);
         }
 
-        fetch(`/documents?${params.toString()}`)
+        authenticatedFetch(`/documents?${params.toString()}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Failed to fetch documents');

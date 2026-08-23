@@ -150,7 +150,7 @@
 
     async function loadDashboardData() {
         try {
-            const response = await fetch('/intelligence/dashboard/data');
+            const response = await authenticatedFetch('/intelligence/dashboard/data');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }

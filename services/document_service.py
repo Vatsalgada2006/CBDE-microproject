@@ -150,13 +150,17 @@ class DocumentService:
             print(f"Error listing documents: {e}")
         return docs
 
-    def list_documents_by_owner_with_filters(self, owner_id: str, search_query: str = '', file_type: str = 'all', sort_by: str = 'date_desc', page: int = 1, limit: int = 12) -> Dict:
+    def list_documents_by_owner_with_filters(self, owner_id: str, search_query: str = '', file_type: str = 'all', sort_by: str = 'date_desc', page: int = 1, limit: int = 12, folder_id: Optional[str] = None) -> Dict:
         """
         List documents for a given owner with filtering, sorting, and pagination.
         """
         try:
             # Start with base query
             query = self.collection.where('owner_id', '==', owner_id)
+
+            # Apply folder filter if provided
+            if folder_id is not None:
+                query = query.where('folder_id', '==', folder_id)
 
             # Apply search filter if provided
             if search_query:
@@ -199,6 +203,8 @@ class DocumentService:
             count_query = self.collection.where('owner_id', '==', owner_id)
 
             # Apply the same filters to count query
+            if folder_id is not None:
+                count_query = count_query.where('folder_id', '==', folder_id)
             if search_query:
                 count_query = count_query.where('filename', '>=', search_query).where('filename', '<=', search_query + '')
             if file_type != 'all':
@@ -215,7 +221,7 @@ class DocumentService:
                     count_query = count_query.where('content_type', '>=', 'text/').where('content_type', '<', 'text/')
 
             # For Firestore, we need to execute the query to get count
-            # In a production app with large datasets, consider maintaining a count field
+            # In a production app with large datasets, consider maintaining a count
             total_docs = len(list(count_query.stream()))
             total_pages = math.ceil(total_docs / limit) if total_docs > 0 else 1
 
@@ -245,3 +251,16 @@ class DocumentService:
                     'total': 0
                 }
             }
+
+    def list_documents_by_folder(self, folder_id: str) -> List[Document]:
+        """
+        List all documents in a given folder.
+        """
+        docs = []
+        try:
+            query = self.collection.where('folder_id', '==', folder_id)
+            for doc in query.stream():
+                docs.append(Document.from_dict(doc.to_dict()))
+        except Exception as e:
+            print(f"Error listing documents by folder: {e}")
+        return docs

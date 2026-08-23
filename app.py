@@ -26,7 +26,7 @@ def create_app():
 
     @app.route('/')
     def index():
-        return render_template('base.html', title='Home')
+        return render_template('index.html', title='Overview - IntelliDoc')
 
     # Initialize demo data for presentation
     initialize_demo_data()

@@ -19,9 +19,587 @@
         window.userData = null;
         {% endif %}
     </script>
+
+    <!-- Firebase Configuration -->
+    <script>
+        // Firebase configuration - replace with your actual Firebase project config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDummyApiKeyForDemoPurposesReplaceWithRealKey",
+            authDomain: "{{ config.FIREBASE_PROJECT_ID }}.firebaseapp.com",
+            projectId: "{{ config.FIREBASE_PROJECT_ID }}",
+            storageBucket: "{{ config.FIREBASE_STORAGE_BUCKET }}",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:dummyappidfornow"
+        };
+    </script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <!-- Authentication State Management -->
+    <script>
+        // Initialize Firebase
+        let firebaseInitialized = false;
+        let auth = null;
+
+        function initializeFirebase() {
+            if (!firebaseInitialized && typeof firebase !== 'undefined') {
+                try {
+                    firebase.initializeApp(firebaseConfig);
+                    auth = firebase.auth();
+                    firebaseInitialized = true;
+                    console.log('Firebase initialized successfully');
+                    return true;
+                } catch (error) {
+                    console.error('Error initializing Firebase:', error);
+                    return false;
+                }
+            }
+            return firebaseInitialized;
+        }
+
+        // Authentication state
+        let currentUser = null;
+        let authToken = null;
+        let isAuthInitialized = false;
+
+        // Initialize authentication when Firebase is ready
+        function initializeAuth() {
+            if (!isAuthInitialized && initializeFirebase()) {
+                // Listen for auth state changes
+                auth.onAuthStateChanged((user) => {
+                    currentUser = user;
+                    if (user) {
+                        // User is signed in, get ID token
+                        user.getIdToken().then((token) => {
+                            authToken = token;
+                            // Send token to backend to verify and set cookie
+                            fetch('/auth/verify-token', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ id_token: token })
+                            })
+                            .then(response => {
+                                if (response.ok) {
+                                    return response.json();
+                                }
+                                throw new Error('Failed to verify token');
+                            })
+                            .then(data => {
+                                // Update user data from backend response
+                                window.userData = data;
+                                console.log('User authenticated:', user.uid);
+                                // Trigger auth state change event
+                                window.dispatchEvent(new Event('authStateChange'));
+                            })
+                            .catch(error => {
+                                console.error('Error verifying token with backend:', error);
+                                // Clear token if verification fails
+                                authToken = null;
+                            });
+                        }).catch((error) => {
+                            console.error('Error getting ID token:', error);
+                            authToken = null;
+                        });
+                    } else {
+                        // User is signed out
+                        currentUser = null;
+                        authToken = null;
+                        window.userData = null;
+                        console.log('User signed out');
+                        // Trigger auth state change event
+                        window.dispatchEvent(new Event('authStateChange'));
+                    }
+                });
+                isAuthInitialized = true;
+                console.log('Authentication state listener initialized');
+            }
+        }
+
+        // Wait for Firebase SDK to load, then initialize
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeAuth);
+        } else {
+            initializeAuth();
+        }
+
+        // Helper function to make authenticated API calls
+        async function authenticatedFetch(url, options = {}) {
+            // Ensure Firebase is initialized
+            if (!initializeFirebase()) {
+                throw new Error('Firebase not initialized');
+            }
+
+            // Get current ID token if user is signed in
+            let token = authToken;
+            if (!token && auth && currentUser) {
+                // Try to get fresh token if we don't have one cached
+                try {
+                    token = await currentUser.getIdToken();
+                    authToken = token;
+                } catch (error) {
+                    console.error('Error getting fresh ID token:', error);
+                    throw new Error('Failed to get authentication token');
+                }
+            }
+
+            // If we still don't have a token, the user is not signed in
+            if (!token) {
+                throw new Error('User is not authenticated');
+            }
+
+            // Prepare headers (but don't override Content-Type if it's already set, e.g., for FormData)
+            const headers = new Headers(options.headers || {});
+            if (!headers.has('Content-Type')) {
+                headers.set('Content-Type', 'application/json');
+            }
+            headers.set('Authorization', `Bearer ${token}`);
+
+            // Make the request
+            const response = await fetch(url, {
+                ...options,
+                headers: headers
+            });
+
+            // Handle 401/403 responses
+            if (response.status === 401 || response.status === 403) {
+                // Clear auth state on unauthorized access
+                authToken = null;
+                if (currentUser) {
+                    // Trigger sign out to refresh state
+                    auth.signOut();
+                }
+                throw new Error('Authentication failed or session expired');
+            }
+
+            return response;
+        }
+
+        // Expose auth state and helper functions globally
+        window.isAuthenticated = () => !!authToken;
+        window.getCurrentUser = () => currentUser;
+        window.getAuthToken = () => authToken;
+        window.authenticatedFetch = authenticatedFetch;
+
+        // Handle token expiration/refresh
+        setInterval(() => {
+            if (isAuthenticated() && auth && currentUser) {
+                // Try to refresh token if it's close to expiring
+                // Firebase tokens expire in 1 hour, refresh 5 minutes before
+                currentUser.getIdToken(true /* forceRefresh */).then((token) => {
+                    authToken = token;
+                }).catch((error) => {
+                    console.warn('Could not refresh token:', error);
+                });
+            }
+        }, 5 * 60 * 1000); // Check every 5 minutes
+
+        // Auth modal handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const authModal = document.getElementById('authModal');
+            const showAuthModalBtn = document.getElementById('showAuthModal');
+            const closeAuthModal = document.getElementById('closeAuthModal');
+            const authTabs = document.querySelectorAll('.auth-tab');
+            const authForms = document.querySelectorAll('.auth-form');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const authProviderBtns = document.querySelectorAll('.auth-provider-btn');
+
+            // Open auth modal
+            if (showAuthModalBtn && authModal) {
+                showAuthModalBtn.addEventListener('click', function() {
+                    authModal.classList.remove('hidden');
+                    // Switch to login tab by default
+                    switchAuthTab('login');
+                });
+            }
+
+            // Close auth modal
+            if (closeAuthModal && authModal) {
+                closeAuthModal.addEventListener('click', function() {
+                    authModal.classList.add('hidden');
+                    clearAuthForms();
+                });
+
+                // Close when clicking outside the modal content
+                authModal.addEventListener('click', function(e) {
+                    if (e.target === authModal) {
+                        authModal.classList.add('hidden');
+                        clearAuthForms();
+                    }
+                });
+            }
+
+            // Auth tab switching
+            authTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    switchAuthTab(tabName);
+                });
+            });
+
+            // Login form submission
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    handleLogin();
+                });
+            }
+
+            // Register form submission
+            if (registerForm) {
+                registerForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    handleRegister();
+                });
+            }
+
+            // Auth provider buttons (Google, GitHub, etc.)
+            authProviderBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const provider = this.getAttribute('data-provider');
+                    signInWithProvider(provider);
+                });
+            });
+        });
+
+        // Switch auth tab
+        function switchAuthTab(tabName) {
+            // Update tabs
+            document.querySelectorAll('.auth-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.getAttribute('data-tab') === tabName);
+            });
+
+            // Update forms
+            document.querySelectorAll('.auth-form').forEach(form => {
+                form.classList.toggle('hidden', form.id !== `${tabName}Form`);
+            });
+        }
+
+        // Clear auth forms
+        function clearAuthForms() {
+            document.getElementById('loginForm')?.reset();
+            document.getElementById('registerForm')?.reset();
+            document.getElementById('loginEmail')?.classList.remove('border-red-500');
+            document.getElementById('loginPassword')?.classList.remove('border-red-500');
+            document.getElementById('registerEmail')?.classList.remove('border-red-500');
+            document.getElementById('registerPassword')?.classList.remove('border-red-500');
+            document.getElementById('registerConfirmPassword')?.classList.remove('border-red-500');
+            document.getElementById('registerName')?.classList.remove('border-red-500');
+        }
+
+        // Handle login with email/password
+        async function handleLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+
+            if (!email) {
+                showAuthError('loginEmail', 'Please enter your email');
+                return;
+            }
+
+            if (!password) {
+                showAuthError('loginPassword', 'Please enter your password');
+                return;
+            }
+
+            try {
+                showAuthLoading(true);
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                const token = await user.getIdToken();
+
+                // Send token to backend to verify and set cookie
+                const response = await fetch('/auth/verify-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id_token: token })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    window.userData = data;
+                    // Close modal and reload page to update UI
+                    document.getElementById('authModal').classList.add('hidden');
+                    location.reload();
+                } else {
+                    throw new Error('Failed to verify token');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAuthError(null, 'Invalid email or password');
+            } finally {
+                showAuthLoading(false);
+            }
+        }
+
+        // Handle registration with email/password
+        async function handleRegister() {
+            const name = document.getElementById('registerName').value.trim();
+            const email = document.getElementById('registerEmail').value.trim();
+            const password = document.getElementById('registerPassword').value.trim();
+            const confirmPassword = document.getElementById('registerConfirmPassword').value.trim();
+
+            if (!name) {
+                showAuthError('registerName', 'Please enter your full name');
+                return;
+            }
+
+            if (!email) {
+                showAuthError('registerEmail', 'Please enter your email');
+                return;
+            }
+
+            if (!password) {
+                showAuthError('registerPassword', 'Please enter your password');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showAuthError('registerConfirmPassword', 'Passwords do not match');
+                return;
+            }
+
+            if (password.length < 6) {
+                showAuthError('registerPassword', 'Password must be at least 6 characters');
+                return;
+            }
+
+            try {
+                showAuthLoading(true);
+                const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+
+                // Update profile with display name
+                await user.updateProfile({
+                    displayName: name
+                });
+
+                const token = await user.getIdToken();
+
+                // Send token to backend to verify and set cookie
+                const response = await fetch('/auth/verify-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id_token: token })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    window.userData = data;
+                    // Close modal and reload page to update UI
+                    document.getElementById('authModal').classList.add('hidden');
+                    location.reload();
+                } else {
+                    throw new Error('Failed to verify token');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                if (error.code === 'auth/email-already-in-use') {
+                    showAuthError('registerEmail', 'This email is already registered');
+                } else {
+                    showAuthError(null, 'Registration failed. Please try again.');
+                }
+            } finally {
+                showAuthLoading(false);
+            }
+        }
+
+        // Handle sign in with provider (Google, GitHub, etc.)
+        async function signInWithProvider(provider) {
+            try {
+                showAuthLoading(true);
+                let providerInstance;
+
+                if (provider === 'google') {
+                    providerInstance = new firebase.auth.GoogleAuthProvider();
+                } else if (provider === 'github') {
+                    providerInstance = new firebase.auth.GithubAuthProvider();
+                } else {
+                    throw new Error('Unsupported provider');
+                }
+
+                const userCredential = await firebase.auth().signInWithPopup(providerInstance);
+                const user = userCredential.user;
+                const token = await user.getIdToken();
+
+                // Send token to backend to verify and set cookie
+                const response = await fetch('/auth/verify-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id_token: token })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    window.userData = data;
+                    // Close modal and reload page to update UI
+                    document.getElementById('authModal').classList.add('hidden');
+                    location.reload();
+                } else {
+                    throw new Error('Failed to verify token');
+                }
+            } catch (error) {
+                console.error(`Provider sign-in error (${provider}):`, error);
+                showAuthError(null, 'Sign-in failed. Please try again.');
+            } finally {
+                showAuthLoading(false);
+            }
+        }
+
+        // Show auth error
+        function showAuthError(fieldId, message) {
+            if (fieldId) {
+                const field = document.getElementById(fieldId);
+                if (field) {
+                    field.classList.add('border-red-500');
+                    const existingError = field.parentElement.querySelector('.auth-error');
+                    if (!existingError) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'auth-error text-sm text-red-500 mt-1';
+                        errorDiv.textContent = message;
+                        field.parentElement.appendChild(errorDiv);
+                    }
+                }
+            } else {
+                // General error
+                const authModal = document.getElementById('authModal');
+                if (authModal) {
+                    let errorDiv = authModal.querySelector('.auth-general-error');
+                    if (!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.className = 'auth-general-error	text-center	text-red-500	mt-4';
+                        authModal.querySelector('.modal-body').appendChild(errorDiv);
+                    }
+                    errorDiv.textContent = message;
+                }
+            }
+        }
+
+        // Show auth loading state
+        function showAuthLoading(isLoading) {
+            const submitButtons = document.querySelectorAll('.auth-form button[type="submit"], .auth-form .btn-primary');
+            submitButtons.forEach(button => {
+                if (isLoading) {
+                    button.innerHTML = '<div class="flex items-center justify-center gap-2"><div class="animate-spin rounded-full border-2 border-white border-gray-700 w-4 h-4"></div><span>Please wait...</span></div>';
+                    button.disabled = true;
+                } else {
+                    if (button.closest('#loginForm')) {
+                        button.innerHTML = 'Sign In';
+                    } else if (button.closest('#registerForm')) {
+                        button.innerHTML = 'Register';
+                    }
+                    button.disabled = false;
+                }
+            });
+        }
+
+        // Handle token expiration/refresh
+        setInterval(() => {
+            if (isAuthenticated() && auth && currentUser) {
+                // Try to refresh token if it's close to expiring
+                // Firebase tokens expire in 1 hour, refresh 5 minutes before
+                currentUser.getIdToken(true /* forceRefresh */).then((token) => {
+                    authToken = token;
+                }).catch((error) => {
+                    console.warn('Could not refresh token:', error);
+                });
+            }
+        }, 5 * 60 * 1000); // Check every 5 minutes
+    </script>
 </head>
 <body>
     <!-- Main Application Container -->
+
+<!-- Auth Modal -->
+<div id="authModal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Sign In to IntelliDoc</h2>
+            <button class="modal-close" id="closeAuthModal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Sign In</button>
+                <button class="auth-tab" data-tab="register">Register</button>
+            </div>
+            <div class="auth-form-container">
+                <!-- Login Form -->
+                <form id="loginForm" class="auth-form space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                        <input type="email" id="loginEmail" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter your email">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <input type="password" id="loginPassword" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter your password">
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <input type="checkbox" id="rememberMe" class="h-4 w-4 text-indigo-600 border-gray-600 rounded">
+                        <label for="rememberMe" class="text-sm text-gray-300">
+                            Remember me
+                        </label>
+                    </div>
+                    <div class="flex justify-between">
+                        <button type="button" id="forgotPassword" class="text-sm text-indigo-400 hover:underline">
+                            Forgot Password?
+                        </button>
+                        <button type="submit" class="w-full btn btn-primary px-6 py-2">
+                            Sign In
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Register Form -->
+                <form id="registerForm" class="auth-form space-y-4 hidden">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
+                        <input type="text" id="registerName" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter your full name">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                        <input type="email" id="registerEmail" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter your email">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <input type="password" id="registerPassword" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter password">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
+                        <input type="password" id="registerConfirmPassword" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Confirm password">
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="btn btn-primary px-6 py-2">
+                            Register
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="mt-4 text-center text-gray-400">
+                <p>Or sign in with:</p>
+                <div class="flex justify-center space-x-4 mt-2">
+                    <button class="auth-provider-btn btn btn-outline px-4 py-2" data-provider="google">
+                        <i class="fab fa-google"></i> Google
+                    </button>
+                    <button class="auth-provider-btn btn btn-outline px-4 py-2" data-provider="github">
+                        <i class="fab fa-github"></i> GitHub
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
     <div class="app-container">
         <!-- Left Sidebar -->
         <aside class="sidebar">
@@ -193,7 +771,9 @@
                                 </div>
                             </div>
                             {% else %}
-                            <a href="/auth/register" class="btn btn-outline btn-sm">Sign In</a>
+                            <button class="btn btn-outline btn-sm" id="showAuthModal">
+                                Sign In
+                            </button>
                             {% endif %}
                         </div>
                     </div>

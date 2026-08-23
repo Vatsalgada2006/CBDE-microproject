@@ -189,7 +189,7 @@ def update_document(doc_id):
         return jsonify({'error': 'No data provided'}), 400
 
     # Update allowed fields
-    allowed_fields = ['filename', 'tags', 'folder_id']
+    allowed_fields = ['filename', 'tags', 'folder_id', 'is_favorite']
     for field in allowed_fields:
         if field in data:
             setattr(document, field, data[field])
@@ -252,6 +252,11 @@ def list_documents():
     sort_by = request.args.get('sort', 'date_desc')
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 12))
+    folder_id = request.args.get('folder_id', None)
+
+    # Convert folder_id to None if it's the string "null" or empty
+    if folder_id in ['null', 'undefined', '']:
+        folder_id = None
 
     # Get documents with filtering and pagination
     result = document_service.list_documents_by_owner_with_filters(
@@ -260,7 +265,8 @@ def list_documents():
         file_type=file_type,
         sort_by=sort_by,
         page=page,
-        limit=limit
+        limit=limit,
+        folder_id=folder_id
     )
 
     return jsonify(result), 200

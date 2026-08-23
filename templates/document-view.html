@@ -196,14 +196,14 @@
     async function loadDocumentData(docId) {
         try {
             // Load document info
-            const docResponse = await fetch(`/documents/${docId}`);
+            const docResponse = await authenticatedFetch(`/documents/${docId}`);
             if (!docResponse.ok) {
                 throw new Error('Failed to load document');
             }
             const docData = await docResponse.json();
 
             // Load intelligence data
-            const intelResponse = await fetch(`/intelligence/document/${docId}/data`);
+            const intelResponse = await authenticatedFetch(`/intelligence/document/${docId}/data`);
             const intelData = intelResponse.ok ? await intelResponse.json() : {};
 
             // Update UI
@@ -681,7 +681,7 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
 
         showLoading();
 
-        fetch(`/documents/${docId}`, {
+        authenticatedFetch(`/documents/${docId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'

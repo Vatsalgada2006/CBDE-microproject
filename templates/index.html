@@ -256,7 +256,7 @@
 
     function loadOverviewStats() {
         // Fetch stats from API
-        fetch('/intelligence/dashboard/data')
+        authenticatedFetch('/intelligence/dashboard/data')
             .then(response => response.json())
             .then(data => {
                 document.getElementById('totalDocuments').textContent = data.total_documents || 0;
@@ -279,7 +279,7 @@
         const activityList = document.getElementById('activityList');
         if (!activityList) return;
 
-        fetch('/intelligence/dashboard/data')
+        authenticatedFetch('/intelligence/dashboard/data')
             .then(response => response.json())
             .then(data => {
                 const documents = data.recent_documents || [];
@@ -316,7 +316,7 @@
         const recentDocsList = document.getElementById('recentDocsList');
         if (!recentDocsList) return;
 
-        fetch('/intelligence/dashboard/data')
+        authenticatedFetch('/intelligence/dashboard/data')
             .then(response => response.json())
             .then(data => {
                 const documents = data.recent_documents || [];
@@ -355,8 +355,8 @@
 
         // Fetch both dashboard data and shares to create meaningful notifications
         Promise.all([
-            fetch('/intelligence/dashboard/data').then(res => res.json()),
-            fetch(`/sharing/`).then(res => res.json()).then(data => {
+            authenticatedFetch('/intelligence/dashboard/data').then(res => res.json()),
+            authenticatedFetch(`/sharing/`).then(res => res.json()).then(data => {
                 // Filter shares where the current user is the recipient
                 // Only fetch shares if user is logged in
                 if (window.userData && window.userData.uid) {
@@ -441,7 +441,7 @@
 
     function loadStorageInfo() {
         // Fetch storage info from dashboard endpoint
-        fetch('/intelligence/dashboard/data')
+        authenticatedFetch('/intelligence/dashboard/data')
             .then(response => response.json())
             .then(data => {
                 const totalSizeBytes = data.total_size_bytes || 0;

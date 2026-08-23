@@ -21,14 +21,17 @@ def token_required(f):
             data = request.get_json()
             if data and 'id_token' in data:
                 id_token = data['id_token']
-        
+        # If not in header or JSON body, check cookies
+        if not id_token:
+            id_token = request.cookies.get('id_token')
+
         if not id_token:
             return jsonify({'error': 'Authentication token is missing'}), 401
-        
+
         decoded_token = verify_firebase_token(id_token)
         if not decoded_token:
             return jsonify({'error': 'Invalid or expired token'}), 401
-        
+
         # Attach the user data to the request context for use in the route
         request.user = decoded_token
         return f(*args, **kwargs)
@@ -90,6 +93,7 @@ def verify_token():
     Verify Firebase ID token and return user data.
     Expects JSON: { "id_token": "firebase_id_token" }
     """
+    from flask import make_response
     data = request.get_json()
     if not data or 'id_token' not in data:
         return jsonify({'error': 'ID token is required'}), 400
@@ -111,12 +115,17 @@ def verify_token():
         )
         user_service.create_user(user)
 
-    return jsonify({
+    # Set a cookie with the ID token for subsequent requests
+    response = make_response(jsonify({
         'uid': user.uid,
         'email': user.email,
         'display_name': user.display_name,
         'photo_url': user.photo_url
-    }), 200
+    }))
+    # Set cookie as HttpOnly in production; for development, we may need to adjust
+    # In production, we should also set Secure=True and SameSite='Lax' or 'Strict'
+    response.set_cookie('id_token', id_token, httponly=True, secure=False, samesite='Lax', max_age=60*60, path='/')  # 1 hour
+    return response
 
 @auth_bp.route('/logout', methods=['POST'])
 @token_required
@@ -125,10 +134,14 @@ def logout():
     Logout endpoint - revoke refresh tokens for the user.
     Expects JSON: { "id_token": "firebase_id_token" } or Authorization header.
     """
+    from flask import make_response
     # The token is already verified by the decorator and available in request.user
     uid = request.user['uid']
     try:
         auth.revoke_refresh_tokens(uid)
-        return jsonify({'message': 'User logged out successfully'}), 200
+        response = make_response(jsonify({'message': 'User logged out successfully'}))
+        # Clear the id_token cookie
+        response.set_cookie('id_token', '', expires=0)
+        return response
     except Exception as e:
         return jsonify({'error': str(e)}), 400
