@@ -8,6 +8,9 @@
             <p class="text-gray-400">View and interact with your document</p>
         </div>
         <div class="flex items-center gap-3">
+            <button id="favoriteBtn" class="btn btn-outline btn-sm hover:bg-gray-700" title="Toggle Favorite">
+                <i class="fas fa-star"></i>
+            </button>
             <button id="shareBtn" class="btn btn-outline btn-sm hover:bg-gray-700">
                 <i class="fas fa-share-alt"></i> Share
             </button>
@@ -139,9 +142,16 @@
     });
 
     function setupEventListeners() {
+        const favoriteBtn = document.getElementById('favoriteBtn');
         const shareBtn = document.getElementById('shareBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const deleteBtn = document.getElementById('deleteBtn');
+
+        if (favoriteBtn) {
+            favoriteBtn.addEventListener('click', function() {
+                toggleFavorite();
+            });
+        }
 
         if (shareBtn) {
             shareBtn.addEventListener('click', function() {
@@ -186,7 +196,7 @@
     async function loadDocumentData(docId) {
         try {
             // Load document info
-            const docResponse = await fetch(`/api/documents/${docId}`);
+            const docResponse = await fetch(`/documents/${docId}`);
             if (!docResponse.ok) {
                 throw new Error('Failed to load document');
             }
@@ -217,6 +227,19 @@
         const headerTitle = document.querySelector('.page-header h1');
         if (headerTitle) {
             headerTitle.innerHTML = `<i class="fas fa-eye holographic"></i> ${docData.filename}`;
+        }
+
+        // Update favorite button state
+        const favoriteBtn = document.getElementById('favoriteBtn');
+        if (favoriteBtn) {
+            const icon = favoriteBtn.querySelector('i');
+            if (docData.is_favorite) {
+                icon.classList.remove('text-gray-400');
+                icon.classList.add('text-yellow-300');
+            } else {
+                icon.classList.remove('text-yellow-300');
+                icon.classList.add('text-gray-400');
+            }
         }
     }
 
@@ -649,6 +672,46 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
         if (!dateString) return '';
         const options = { year: 'numeric', month: 'short', day: 'numeric' };
         return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+
+    function toggleFavorite() {
+        const docId = window.location.pathname.split('/').pop();
+        const favoriteBtn = document.getElementById('favoriteBtn');
+        const isCurrentlyFavorite = favoriteBtn.querySelector('i').classList.contains('text-yellow-300');
+
+        showLoading();
+
+        fetch(`/documents/${docId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_favorite: !isCurrentlyFavorite })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to update favorite status');
+            }
+            return response.json();
+        })
+        .then(data => {
+            hideLoading();
+            // Update UI
+            const icon = favoriteBtn.querySelector('i');
+            if (!isCurrentlyFavorite) {
+                icon.classList.remove('text-gray-400');
+                icon.classList.add('text-yellow-300');
+            } else {
+                icon.classList.remove('text-yellow-300');
+                icon.classList.add('text-gray-400');
+            }
+            showSuccessMessage(isCurrentlyFavorite ? 'Removed from favorites' : 'Added to favorites');
+        })
+        .catch(error => {
+            console.error('Error toggling favorite:', error);
+            hideLoading();
+            showErrorState('Failed to update favorite status. Please try again.');
+        });
     }
 
     function showErrorState(message) {
