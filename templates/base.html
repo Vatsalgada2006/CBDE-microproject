@@ -11,176 +11,638 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- Additional libraries for enhanced UI -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Expose user data to JavaScript -->
+    <script>
+        window.userData = {{ request.user | tojson | safe }};
+    </script>
 </head>
 <body>
-    <!-- Floating action button for quick actions -->
-    <div class="fab-container">
-        <button id="fab" class="btn btn-primary btn-icon float">
-            <i class="fas fa-plus"></i>
-        </button>
-        <div class="fab-options">
-            <a href="/documents/upload/form" class="btn btn-outline btn-icon">
-                <i class="fas fa-upload"></i> Upload
-            </a>
-            <a href="/documents/view" class="btn btn-outline btn-icon">
-                <i class="fas fa-folder-plus"></i> New Folder
-            </a>
-            <a href="/sharing" class="btn btn-outline btn-icon">
-                <i class="fas fa-share-alt"></i> Share
-            </a>
-        </div>
-    </div>
-
-    <div class="container">
-        <header>
-            <div class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-brain"></i>
+    <!-- Main Application Container -->
+    <div class="app-container">
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="workspace-selector">
+                    <div class="workspace-icon">
+                        <i class="fas fa-sitemap"></i>
+                    </div>
+                    <div class="workspace-info">
+                        <div class="workspace-name">My Workspace</div>
+                        <div class="workspace-status">Active</div>
+                    </div>
                 </div>
-                <div class="logo-text">IntelliDoc</div>
+                <button class="sidebar-toggle" id="sidebarToggle">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
             </div>
-            <nav>
-                <a href="/" class="{{ 'active' if request.path == '/' else '' }}">Home</a>
-                <a href="/documents/view" class="{{ 'active' if request.path.startswith('/documents/view') else '' }}">Documents</a>
-                <a href="/folders" class="{{ 'active' if request.path.startswith('/folders') else '' }}">Folders</a>
-                <a href="/sharing" class="{{ 'active' if request.path.startswith('/sharing') else '' }}">Sharing</a>
-                <a href="/intelligence/dashboard" class="{{ 'active' if request.path.startswith('/intelligence') else '' }}">Intelligence</a>
+
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-item">
+                        <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                            <i class="fas fa-home nav-icon"></i>
+                            <span class="nav-text">Overview</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/documents/view" class="nav-link {% if request.path.startswith('/documents/view') and not request.path.startswith('/documents/view/') %}active{% endif %}">
+                            <i class="fas fa-columns nav-icon"></i>
+                            <span class="nav-text">Documents</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/documents/view" class="nav-link {% if request.path.startswith('/documents/view') and not request.path.startswith('/documents/view/') %}active{% endif %}">
+                            <i class="fas fa-folder nav-icon"></i>
+                            <span class="nav-text">My Documents</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/sharing" class="nav-link {% if request.path.startswith('/sharing') %}active{% endif %}">
+                            <i class="fas fa-share-alt nav-icon"></i>
+                            <span class="nav-text">Shared With Me</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-clock nav-icon"></i>
+                            <span class="nav-text">Recent</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-star nav-icon"></i>
+                            <span class="nav-text">Favorites</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/folders" class="nav-link {% if request.path.startswith('/folders') %}active{% endif %}">
+                            <i class="fas fa-folder nav-icon"></i>
+                            <span class="nav-text">Folders</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-trash nav-icon"></i>
+                            <span class="nav-text">Trash</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-cogs nav-icon"></i>
+                            <span class="nav-text">Workspace</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-users nav-icon"></i>
+                            <span class="nav-text">Team Members</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-chart-line nav-icon"></i>
+                            <span class="nav-text">Activity</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-eye nav-icon"></i>
+                            <span class="nav-text">Analytics</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-cog nav-icon"></i>
+                            <span class="nav-text">Settings</span>
+                        </a>
+                    </li>
+                </ul>
             </nav>
-            <div class="user-menu">
-                {% if request.user %}
-                <div class="user-info">
-                    <div class="user-name">{{ request.user.get('name', request.user.get('email', 'User')) }}</div>
-                    <div class="user-email">{{ request.user.get('email', '') }}</div>
+
+            <div class="sidebar-footer">
+                <div class="storage-info">
+                    <div class="storage-label">Storage Used</div>
+                    <div class="storage-bar">
+                        <div class="storage-fill" id="storageFill" style="width: 0%;"></div>
+                    </div>
+                    <div class="storage-text" id="storageText">0 GB / 0 GB</div>
                 </div>
-                <div class="user-avatar">
-                    {{ request.user.get('name', request.user.get('email', 'U'))[0] | upper }}
+                <div class="version-info">
+                    <small>v2.1.0</small>
                 </div>
-                <div class="dropdown">
-                    <button class="dropdown-toggle" id="userDropdown">
-                        <i class="fas fa-chevron-down"></i>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="menu-toggle" id="menuToggle">
+                        <i class="fas fa-bars"></i>
                     </button>
-                    <div class="dropdown-menu" id="userMenu">
-                        <a href="/auth/logout" class="dropdown-item">
-                            <i class="fas fa-sign-out-alt"></i> Logout
+                    <div class="page-title">
+                        <h1 id="pageTitle">Overview</h1>
+                        <p id="pageSubtitle">Your workspace at a glance</p>
+                    </div>
+                </div>
+
+                <div class="top-bar-center">
+                    <div class="search-container">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="globalSearch" placeholder="Search documents, folders, tags...">
+                        <div class="search-filters">
+                            <button class="filter-btn" id="searchFilterBtn">
+                                <i class="fas fa-sliders-h"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
-                {% else %}
-                <a href="/auth/register" class="btn btn-outline btn-sm">Sign In</a>
-                {% endif %}
-            </div>
-        </header>
 
-        <main>
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} fade-in">
-                            <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'error' %}fa-times-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %} alert-icon"></i>
-                            <div class="alert-message">{{ message }}</div>
+                <div class="top-bar-right">
+                    <div class="top-bar-actions">
+                        <button class="action-btn btn-icon" id="notificationBtn">
+                            <i class="fas fa-bell"></i>
+                            <span class="notification-badge" id="notificationBadge">0</span>
+                        </button>
+
+                        <button class="action-btn btn-icon" id="createBtn">
+                            <i class="fas fa-plus"></i>
+                            <span class="btn-label">Create</span>
+                        </button>
+
+                        <div class="user-profile">
+                            {% if request.user %}
+                            <div class="user-avatar">
+                                {{ request.user.get('email', 'U')[0] | upper }}
+                            </div>
+                            <div class="user-info">
+                                <div class="user-name">{{ request.user.get('email', 'User').split('@')[0] }}</div>
+                                <div class="user-status status-online">Online</div>
+                            </div>
+                            <div class="user-dropdown">
+                                <i class="fas fa-chevron-down"></i>
+                                <div class="dropdown-menu">
+                                    <a href="/auth/logout" class="dropdown-item">
+                                        <i class="fas fa-sign-out-alt"></i> Logout
+                                    </a>
+                                </div>
+                            </div>
+                            {% else %}
+                            <a href="/auth/register" class="btn btn-outline btn-sm">Sign In</a>
+                            {% endif %}
                         </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+                    </div>
+                </div>
+            </header>
 
-            {% block content %}{% endblock %}
-        </main>
+            <!-- Page Content -->
+            <main class="page-content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} fade-in">
+                                <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'error' %}fa-times-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %} alert-icon"></i>
+                                <div class="alert-message">{{ message }}</div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
 
-        <footer>
-            <div>
-                <span>&copy; {{ now().year }} IntelliDoc. All rights reserved.</span>
-                <span> | </span>
-                <a href="#">Privacy Policy</a>
-                <span> | </span>
-                <a href="#">Terms of Service</a>
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Create Action Modal -->
+    <div id="createModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New</h2>
+                <button class="modal-close" id="closeCreateModal">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
-                Powered by Flask & Firebase | Document Intelligence Engine v2.1
+            <div class="modal-body">
+                <div class="create-options">
+                    <button class="create-option" data-type="document">
+                        <div class="create-option-icon">
+                            <i class="fas fa-file-upload"></i>
+                        </div>
+                        <div class="create-option-info">
+                            <h3>Document</h3>
+                            <p>Upload or create a new document</p>
+                        </div>
+                    </button>
+                    <button class="create-option" data-type="folder">
+                        <div class="create-option-icon">
+                            <i class="fas fa-folder-plus"></i>
+                        </div>
+                        <div class="create-option-info">
+                            <h3>Folder</h3>
+                            <p>Create a new folder</p>
+                        </div>
+                    </button>
+                    <button class="create-option" data-type="note">
+                        <div class="create-option-icon">
+                            <i class="fas fa-sticky-note"></i>
+                        </div>
+                        <div class="create-option-info">
+                            <h3>Note</h3>
+                            <p>Create a quick note</p>
+                        </div>
+                    </button>
+                </div>
             </div>
-        </footer>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div id="notificationModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Notifications</h2>
+                <button class="modal-close" id="closeNotificationModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="notifications-list" id="notificationsList">
+                    <!-- Notifications will be injected here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="clearNotifications">
+                    Clear All
+                </button>
+                <button class="btn btn-primary" id="markAllRead">
+                    Mark All as Read
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folder Creation Modal -->
+    <div id="folderModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">New Folder</h2>
+                <button class="modal-close" id="closeFolderModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="folderForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Folder Name</label>
+                        <input type="text" id="folderName" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter folder name">
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                        <input type="checkbox" id="folderPublicCheckbox" class="h-4 w-4 text-indigo-600 border-gray-600 rounded">
+                        <label for="folderPublicCheckbox" class="text-sm text-gray-300">
+                            Make folder accessible to team
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button type="button" id="cancelFolderBtn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md mr-2">
+                            Cancel
+                        </button>
+                        <button type="submit" id="saveFolderBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md">
+                            Create Folder
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Modal -->
+    <div id="bulkModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Bulk Actions</h2>
+                <button class="modal-close" id="closeBulkModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="bulkActionForm" class="space-y-4">
+                    <div id="bulkActionContent">
+                        <!-- Content will be injected based on action -->
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button type="button" id="cancelBulkAction" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md mr-2">
+                            Cancel
+                        </button>
+                        <button type="submit" id="confirmBulkAction" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md">
+                            Confirm Action
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Action Modal -->
+    <div id="createModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New</h2>
+                <button class="modal-close" id="closeCreateModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="create-options">
+                    <button class="create-option" data-type="document">
+                        <div class="create-option-icon">
+                            <i class="fas fa-file-upload"></i>
+                        </div>
+                        <div class="create-option-info">
+                            <h3>Document</h3>
+                            <p>Upload or create a new document</p>
+                        </div>
+                    </button>
+                    <button class="create-option" data-type="folder">
+                        <div class="create-option-icon">
+                            <i class="fas fa-folder-plus"></i>
+                        </div>
+                        <div class="create-option-info">
+                            <h3>Folder</h3>
+                            <p>Create a new folder</p>
+                        </div>
+                    </button>
+                    <button class="create-option" data-type="note">
+                        <div class="create-option-icon">
+                            <i class="fas fa-sticky-note"></i>
+                        </div>
+                        <div class="create-option-info">
+                            <h3>Note</h3>
+                            <p>Create a quick note</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // FAB (Floating Action Button) functionality
+        // Sidebar toggle functionality
         document.addEventListener('DOMContentLoaded', function() {
-            const fab = document.getElementById('fab');
-            const fabOptions = document.querySelector('.fab-options');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const menuToggle = document.getElementById('menuToggle');
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('.main-content');
 
-            fab.addEventListener('click', function() {
-                fabOptions.classList.toggle('show');
-                fab.classList.toggle('open');
-            });
+            function toggleSidebar() {
+                sidebar.classList.toggle('collapsed');
+                mainContent.classList.toggle('expanded');
+            }
 
-            // Close FAB options when clicking outside
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', toggleSidebar);
+            }
+
+            if (menuToggle) {
+                menuToggle.addEventListener('click', toggleSidebar);
+            }
+
+            // Close sidebar on click outside (mobile)
             document.addEventListener('click', function(e) {
-                if (!fab.contains(e.target) && !fabOptions.contains(e.target)) {
-                    fabOptions.classList.remove('show');
-                    fab.classList.remove('open');
+                if (window.innerWidth <= 768) {
+                    if (!sidebar.contains(e.target) && !menuToggle.contains(e.target) && !sidebar.classList.contains('collapsed')) {
+                        sidebar.classList.add('collapsed');
+                        mainContent.classList.add('expanded');
+                    }
                 }
             });
-        });
 
-        // User dropdown functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const userDropdown = document.getElementById('userDropdown');
-            const userMenu = document.getElementById('userMenu');
+            // Responsive handling
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('collapsed');
+                    mainContent.classList.remove('expanded');
+                }
+            });
 
-            if (userDropdown && userMenu) {
-                userDropdown.addEventListener('click', function(e) {
+            // User dropdown
+            const userProfile = document.querySelector('.user-profile');
+            if (userProfile) {
+                userProfile.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    userMenu.classList.toggle('show');
-                });
-
-                document.addEventListener('click', function(e) {
-                    if (!userDropdown.contains(e.target) && !userMenu.contains(e.target)) {
-                        userMenu.classList.remove('show');
-                    }
-                });
-            }
-        });
-
-        // Auto-dismiss alerts after 5 seconds
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(function() {
-                const alerts = document.querySelectorAll('.alert');
-                alerts.forEach(function(alert) {
-                    alert.style.opacity = '0';
-                    alert.style.transform = 'translateY(-10px)';
-                    setTimeout(function() {
-                        alert.remove();
-                    }, 300);
-                });
-            }, 5000);
-        });
-
-        // Add fade-in animation to elements on scroll
-        document.addEventListener('DOMContentLoaded', function() {
-            const fadeElements = document.querySelectorAll('.fade-in');
-
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('fade-in-active');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, { threshold: 0.1 });
-
-            fadeElements.forEach(el => {
-                observer.observe(el);
+                    const dropdown = this.querySelector('.dropdown-menu');
+        if (dropdown) {
+                    dropdown.classList.toggle('show');
+                }
             });
 
-            // Add animation delay based on index for staggered effect
-            fadeElements.forEach((el, index) => {
-                el.style.animationDelay = (index * 0.1) + 's';
+            document.addEventListener('click', function(e) {
+                if (!userProfile.contains(e.target)) {
+                    const dropdowns = document.querySelectorAll('.dropdown-menu');
+                    dropdowns.forEach(dropdown => {
+                        dropdown.classList.remove('show');
+                    });
+                }
             });
-        });
+        }
 
-        // Initialize 3D scene for background effects (optional enhancement)
-        document.addEventListener('DOMContentLoaded', function() {
-            // This would initialize a 3D background scene if needed
-            // For now, we rely on CSS animations for the space theme
-        });
-    </script>
+        // Create modal
+        const createBtn = document.getElementById('createBtn');
+        const createModal = document.getElementById('createModal');
+        const closeCreateModal = document.getElementById('closeCreateModal');
+
+        if (createBtn && createModal && closeCreateModal) {
+            createBtn.addEventListener('click', function() {
+                createModal.classList.remove('hidden');
+            });
+
+            closeCreateModal.addEventListener('click', function() {
+                createModal.classList.add('hidden');
+            });
+
+            createModal.addEventListener('click', function(e) {
+                if (e.target === createModal) {
+                    createModal.classList.add('hidden');
+                }
+            });
+
+            // Handle create options
+            const createOptions = document.querySelectorAll('.create-option');
+            createOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    const type = this.getAttribute('data-type');
+                    createModal.classList.add('hidden');
+
+                    switch(type) {
+                        case 'document':
+                            window.location.href = '/documents/upload/form';
+                            break;
+                        case 'folder':
+                            openFolderModal();
+                            break;
+                        case 'note':
+                            // TODO: Implement note creation
+                            alert('Note creation coming soon!');
+                            break;
+                    }
+                });
+            });
+        }
+
+        // Notification modal
+        const notificationBtn = document.getElementById('notificationBtn');
+        const notificationModal = document.getElementById('notificationModal');
+        const closeNotificationModal = document.getElementById('closeNotificationModal');
+
+        if (notificationBtn && notificationModal && closeNotificationModal) {
+            notificationBtn.addEventListener('click', function() {
+                notificationModal.classList.remove('hidden');
+                loadNotifications();
+            });
+
+            closeNotificationModal.addEventListener('click', function() {
+                notificationModal.classList.add('hidden');
+            });
+
+            notificationModal.addEventListener('click', function(e) {
+                if (e.target === notificationModal) {
+                    notificationModal.classList.add('hidden');
+                }
+            });
+        }
+
+        // Global search
+        const globalSearch = document.getElementById('globalSearch');
+        if (globalSearch) {
+            globalSearch.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performGlobalSearch();
+                }
+            });
+        }
+
+        // Page title updates based on route
+        updatePageTitle();
+
+        // Load storage info
+        loadStorageInfo();
+    });
+
+    function updatePageTitle() {
+        const path = window.location.pathname;
+        const titleElement = document.getElementById('pageTitle');
+        const subtitleElement = document.getElementById('pageSubtitle');
+
+        if (!titleElement || !subtitleElement) return;
+
+        let title = 'Overview';
+        let subtitle = 'Your workspace at a glance';
+
+        if (path === '/') {
+            title = 'Overview';
+            subtitle = 'Your workspace at a glance';
+        } else if (path.startsWith('/documents/view') && !path.startsWith('/documents/view/')) {
+            title = 'Documents';
+            subtitle = 'Manage and organize your documents';
+        } else if (path.startsWith('/documents/view/')) {
+            title = 'Document Preview';
+            subtitle = 'View and interact with your document';
+        } else if (path.startsWith('/folders')) {
+            title = 'Folders';
+            subtitle = 'Organize your documents in folders';
+        } else if (path.startsWith('/sharing')) {
+            title = 'Sharing';
+            subtitle = 'Manage shared documents and collaborations';
+        } else if (path.startsWith('/intelligence')) {
+            title = 'Intelligence';
+            subtitle = 'AI-powered insights and analytics';
+        }
+
+        titleElement.textContent = title;
+        subtitleElement.textContent = subtitle;
+    }
+
+    function performGlobalSearch() {
+        const searchInput = document.getElementById('globalSearch');
+        if (searchInput && searchInput.value.trim()) {
+            const query = searchInput.value.trim();
+            window.location.href = `/documents/view?search=${encodeURIComponent(query)}`;
+        }
+    }
+
+    function loadNotifications() {
+        // TODO: Implement actual notification loading from API
+        const notificationsList = document.getElementById('notificationsList');
+        if (!notificationsList) return;
+
+        notificationsList.innerHTML = `
+            <div class="notification-item">
+                <div class="notification-icon">
+                    <i class="fas fa-upload text-blue-400"></i>
+                </div>
+                <div class="notification-content">
+                    <h3 class="notification-title">No notifications</h3>
+                    <p class="notification-text text-muted">You have no new notifications</p>
+                    <time class="notification-time">Just now</time>
+                </div>
+            </div>
+        `;
+    }
+
+    function loadStorageInfo() {
+        // Mock storage data for now - in real app, this would come from API
+        document.getElementById('storageFill').style.width = '65%';
+        document.getElementById('storageText').textContent = '65 GB / 100 GB';
+    }
+
+    function openFolderModal() {
+        const modal = document.getElementById('folderModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            document.getElementById('folderName').focus();
+        }
+    }
+
+    function showErrorState(message) {
+        // Show error in main content area
+        const mainContent = document.querySelector('.page-content');
+        if (mainContent) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-error fade-in';
+            errorDiv.innerHTML = `
+                <i class="fas fa-exclamation-triangle alert-icon"></i>
+                <div class="alert-message">${message || 'An error occurred'}</div>
+            `;
+            mainContent.insertBefore(errorDiv, mainContent.firstChild);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 3000);
+        }
+    }
+
+    function showSuccessState(message) {
+        // Show success in main content area
+        const mainContent = document.querySelector('.page-content');
+        if (mainContent) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success fade-in';
+            successDiv.innerHTML = `
+                <i class="fas fa-check-circle alert-icon"></i>
+                <div class="alert-message">${message || 'Success!'}</div>
+            `;
+            mainContent.insertBefore(successDiv, mainContent.firstChild);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        }
+    }
+</script>
 </body>
 </html>

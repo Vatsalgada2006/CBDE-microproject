@@ -1,0 +1,1063 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Overview Dashboard -->
+<div class="space-y-6">
+
+    <!-- Stats Row -->
+    <div class="grid grid-4 gap-4">
+        <div class="stat-card text-purple">
+            <div class="stat-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-value" id="totalDocuments">0</div>
+            <div class="stat-label">Documents</div>
+        </div>
+        <div class="stat-card text-blue">
+            <div class="stat-icon">
+                <i class="fas fa-folder"></i>
+            </div>
+            <div class="stat-value" id="totalFolders">0</div>
+            <div class="stat-label">Folders</div>
+        </div>
+        <div class="stat-card text-green">
+            <div class="stat-icon">
+                <i class="fas fa-share-alt"></i>
+            </div>
+            <div class="stat-value" id="sharedDocuments">0</div>
+            <div class="stat-label">Shared</div>
+        </div>
+        <div class="stat-card text-orange">
+            <div class="stat-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="stat-value" id="aiProcessed">0</div>
+            <div class="stat-label">AI Processed</div>
+        </div>
+    </div>
+
+    <!-- Main Content Row -->
+    <div class="grid grid-2 lg:grid-cols-[300px_1fr] gap-6">
+
+        <!-- Left Panel: Quick Access & Activity -->
+        <div class="space-y-4">
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Quick Actions</h3>
+                </div>
+                <div class="card-content space-y-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted font-weight-medium">Create New</span>
+                        <button id="quickCreateBtn" class="btn btn-outline btn-sm">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        <button class="btn btn-outline w-full text-left justify-content-start" data-action="document">
+                            <i class="fas fa-file-alt me-2"></i> Document
+                        </button>
+                        <button class="btn btn-outline w-full text-left justify-content-start" data-action="folder">
+                            <i class="fas fa-folder me-2"></i> Folder
+                        </button>
+                        <button class="btn btn-outline w-full text-left justify-content-start" data-action="note">
+                            <i class="fas fa-sticky-note me-2"></i> Note
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Activity</h3>
+                </div>
+                <div class="card-content">
+                    <div class="activity-list" id="activityList">
+                        <!-- Activity items will be injected here -->
+                        <div class="text-center py-4 text-muted">
+                            No recent activity
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Storage Usage -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Storage Usage</h3>
+                </div>
+                <div class="card-content">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Documents</span>
+                            <span id="storageDocuments">0 GB</span>
+                        </div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar bg-purple" id="storageProgress"></div>
+                    </div>
+                    <div class="mt-2 d-flex justify-content-between text-sm">
+                        <span>Used: <span id="storageUsed">0 GB</span></span>
+                        <span>Free: <span id="storageFree">0 GB</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Documents & Analytics -->
+        <div class="space-y-4">
+            <!-- Recent Documents -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">Recent Documents</h3>
+                    <a href="/documents/view" class="btn btn-outline btn-sm">View All</a>
+                </div>
+                <div class="card-content">
+                    <div class="recent-docs-list" id="recentDocsList">
+                        <!-- Recent documents will be injected here -->
+                        <div class="text-center py-4 text-muted">
+                            No documents yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Analytics -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Document Analytics</h3>
+                </div>
+                <div class="card-content">
+                    <div class="space-y-4">
+                        <!-- File Type Distribution -->
+                        <div>
+                            <h4 class="font-weight-medium mb-2">File Types</h4>
+                            <div id="fileTypeChart" style="height: 180px;"></div>
+                        </div>
+
+                        <!-- Activity Timeline -->
+                        <div>
+                            <h4 class="font-weight-medium mb-2">Activity Timeline</h4>
+                            <div id="activityTimeline" style="height: 180px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row: Notifications & Quick Share -->
+    <div class="grid grid-2 gap-4">
+        <!-- Notifications -->
+        <divclass="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title">Notifications</h3>
+                <a href="#" class="btn btn-outline btn-sm" id="viewAllNotifications">View All</a>
+            </div>
+            <div class="card-content">
+                <div class="notifications-list" id="notificationsList">
+                    <!-- Notifications will be injected here -->
+                    <div class="text-center py-4 text-muted">
+                        No notifications
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Share -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Quick Share</h3>
+            </div>
+            <div class="card-content">
+                <form id="quickShareForm">
+                    <div class="mb-3">
+                        <label class="form-label">Share via Link</label>
+                        <div class="input-group">
+                            <input type="text" id="shareLink" class="form-input" placeholder="Shareable link will appear here..." readonly>
+                            <button type="button" class="btn btn-outline" id="copyLinkBtn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-1">Link expires in 7 days</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email Sharing</label>
+                        <input type="email" id="shareEmail" class="form-input" placeholder="Enter email address">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Permission</label>
+                        <select class="form-input" id="sharePermission">
+                            <option value="view">Can view</option>
+                            <option value="download">Can download</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">
+                        Share Document
+                    </button>
+                </form>
+                <div id="quickShareResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load overview data
+        loadOverviewStats();
+        loadRecentActivity();
+        loadRecentDocuments();
+        loadNotifications();
+        loadStorageInfo();
+        loadAnalytics();
+
+        // Quick create button
+        const quickCreateBtn = document.getElementById('quickCreateBtn');
+        if (quickCreateBtn) {
+            quickCreateBtn.addEventListener('click', function() {
+                document.getElementByid('createModal').classList.remove('hidden');
+            });
+        }
+
+        // Copy link button
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', function() {
+                const shareLink = document.getElementById('shareLink');
+                shareLink.select();
+                document.execCommand('copy');
+                showTooltip(copyLinkBtn, 'Link copied!');
+            });
+        }
+
+        // Quick share form
+        const quickShareForm = document.getElementById('quickShareForm');
+        if (quickShareForm) {
+            quickShareForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                handleQuickShare();
+            });
+        }
+
+        // View all notifications
+        const viewAllNotifications = document.getElementById('viewAllNotifications');
+        if (viewAllNotifications) {
+            viewAllNotifications.addEventListener('click', function(e) {
+                e.preventDefault();
+                // TODO: Navigate to notifications page
+                alert('Notifications page coming soon!');
+            });
+        }
+    });
+
+    function loadOverviewStats() {
+        // Fetch stats from API
+        fetch('/intelligence/dashboard/data')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalDocuments').textContent = data.total_documents || 0;
+                document.getElementById('totalFolders').textContent = data.total_folders || 0;
+                document.getElementById('sharedDocuments').textContent = data.total_shared || 0;
+                document.getElementById('aiProcessed').textContent = data.ai_processed || 0;
+            })
+            .catch(error => {
+                console.error('Error loading stats:', error);
+                // Set default values
+                document.getElementById('totalDocuments').textContent = '0';
+                document.getElementById('totalFolders').textContent = '0';
+                document.getElementById('sharedDocuments').textContent = '0';
+                document.getElementById('aiProcessed').textContent = '0';
+            });
+    }
+
+    function loadRecentActivity() {
+        // Fetch recent activity from dashboard endpoint
+        const activityList = document.getElementById('activityList');
+        if (!activityList) return;
+
+        fetch('/intelligence/dashboard/data')
+            .then(response => response.json())
+            .then(data => {
+                const documents = data.recent_documents || [];
+                if (documents.length === 0) {
+                    activityList.innerHTML = '<div class="text-center py-4 text-muted">No recent activity</div>';
+                    return;
+                }
+
+                activityList.innerHTML = documents.map(doc => `
+                    <div class="activity-item d-flex align-items-start mb-3">
+                        <div class="flex-shrink-0">
+                            <div class="activity-icon bg-purple-light text-purple rounded-circle">
+                                <i class="${getActivityIcon('upload')}"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="activity-content">
+                                <div class="activity-title font-weight-medium">${doc.filename || 'Untitled'}</div>
+                                <div class="activity-description text-muted small">Document uploaded</div>
+                                <div class="activity-time text-muted small">${formatTimeAgo(doc.CreatedAt)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(error => {
+                console.error('Error loading activity:', error);
+                activityList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load activity</div>';
+            });
+    }
+
+    function loadRecentDocuments() {
+        // Fetch recent documents from dashboard endpoint
+        const recentDocsList = document.getElementById('recentDocsList');
+        if (!recentDocsList) return;
+
+        fetch('/intelligence/dashboard/data')
+            .then(response => response.json())
+            .then(data => {
+                const documents = data.recent_documents || [];
+                if (documents.length === 0) {
+                    recentDocsList.innerHTML = '<div class="text-center py-4 text-muted">No documents yet</div>';
+                    return;
+                }
+
+                recentDocsList.innerHTML = documents.map(doc => `
+                    <div class="recent-doc-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
+                        <div class="flex-shrink-0">
+                            <div class="doc-icon bg-${getDocColorClass(doc.content_type)} text-${getDocTextColorClass(doc.content_type)} rounded-circle">
+                                <i class="${getDocIcon(doc.content_type)}"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="doc-title font-weight-medium">${doc.filename || 'Untitled'}</div>
+                            <div class="doc-meta text-muted small d-flex justify-content-between">
+                                <span>${formatFileSize(doc.size)}</span>
+                                <span>${formatDate(doc.CreatedAt)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(error => {
+                console.error('Error loading recent documents:', error);
+                recentDocsList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load documents</div>';
+            });
+    }
+
+    function loadNotifications() {
+        // Fetch notifications from dashboard endpoint and shares
+        const notificationsList = document.getElementById('notificationsList');
+        if (!notificationsList) return;
+
+        // Fetch both dashboard data and shares to create meaningful notifications
+        Promise.all([
+            fetch('/intelligence/dashboard/data').then(res => res.json()),
+            fetch(`/sharing/`).then(res => res.json()).then(data => {
+                // Filter shares where the current user is the recipient
+                const allShares = data.shares || [];
+                return allShares.filter(share => share.shared_with_id === window.userData.uid);
+            }).catch(() => []))
+        ])
+        .then(([dashboardData, sharesData]) => {
+            const documents = dashboardData.recent_documents || [];
+            const shares = sharesData || [];
+            let notificationsHTML = '';
+
+            // Add share notifications
+            if (shares.length > 0) {
+                notificationsHTML += shares.map(share => `
+                    <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
+                        <div class="flex-shrink-0">
+                            <div class="notification-icon bg-success-light text-success rounded-circle">
+                                <i class="fas fa-share-alt"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="notification-content">
+                                <h3 class="notification-title font-weight-medium">Document shared with you</h3>
+                                <div class="notification-text text-muted small">${share.filename || 'A document'} was shared with you</div>
+                                <div class="notification-time text-muted small">${formatTimeAgo(share.sharedAt || share.CreatedAt)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Add upload notifications from recent documents
+            if (documents.length > 0) {
+                notificationsHTML += documents.map(doc => `
+                    <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
+                        <div class="flex-shrink-0">
+                            <div class="notification-icon bg-info-light text-info rounded-circle">
+                                <i class="fas fa-upload"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="notification-content">
+                                <h3 class="notification-title font-weight-medium">Document uploaded</h3>
+                                <div class="notification-text text-muted small">${doc.filename || 'Untitled'} was uploaded</div>
+                                <div class="notification-time text-muted small">${formatTimeAgo(doc.CreatedAt)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // If no notifications, show welcome message
+            if (notificationsHTML === '') {
+                notificationsHTML = `
+                    <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
+                        <div class="flex-shrink-0">
+                            <div class="notification-icon bg-info-light text-info rounded-circle">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="notification-content">
+                                <h3 class="notification-title font-weight-medium">Welcome to IntelliDoc</h3>
+                                <div class="notification-text text-muted small">Your document management system is ready to use</div>
+                                <div class="notification-time text-muted small">Just now</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            notificationsList.innerHTML = notificationsHTML;
+        })
+        .catch(error => {
+            console.error('Error loading notifications:', error);
+            notificationsList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load notifications</div>';
+        });
+    }
+
+    function loadStorageInfo() {
+        // Fetch storage info from dashboard endpoint
+        fetch('/intelligence/dashboard/data')
+            .then(response => response.json())
+            .then(data => {
+                const totalSizeBytes = data.total_size_bytes || 0;
+                const totalSizeGB = (totalSizeBytes / (1024 * 1024 * 1024)).toFixed(2);
+                const storageLimit = 100; // 100 GB limit - in a real app, this would come from user's plan
+                const usagePercent = Math.min(((totalSizeBytes / (storageLimit * 1024 * 1024 * 1024)) * 100).toFixed(1), 100);
+
+                document.getElementById('storageDocuments').textContent = `${totalSizeGB} GB`;
+                document.getElementById('storageProgress').style.width = `${usagePercent}%`;
+                document.getElementById('storageUsed').textContent = `${totalSizeGB} GB`;
+                document.getElementById('storageFree').textContent = `${(storageLimit - parseFloat(totalSizeGB)).toFixed(2)} GB`;
+            })
+            .catch(error => {
+                console.error('Error loading storage info:', error);
+                // Set default values
+                document.getElementById('storageDocuments').textContent = '0 GB';
+                document.getElementById('storageProgress').style.width = '0%';
+                document.getElementById('storageUsed').textContent = '0 GB';
+                document.getElementById('storageFree').textContent = '0 GB';
+            });
+    }
+
+    function loadAnalytics() {
+        // Load charts (simplified for now)
+        // In a real implementation, you would use Chart.js or similar
+        const fileTypeChart = document.getElementById('fileTypeChart');
+        if (fileTypeChart) {
+            fileTypeChart.innerHTML = '<div class="text-center py-4 text-muted">File type distribution chart</div>';
+        }
+
+        const activityTimeline = document.getElementById('activityTimeline');
+        if (activityTimeline) {
+            activityTimeline.innerHTML = '<div class="text-center py-4 text-muted">Activity timeline chart</div>';
+        }
+    }
+
+    function handleQuickShare() {
+        const shareEmail = document.getElementById('shareEmail').value.trim();
+        const sharePermission = document.getElementById('sharePermission').value;
+
+        if (!shareEmail) {
+            showError('Please enter an email address');
+            return;
+        }
+
+        // Simulate sharing
+        const shareResult = document.getElementById('quickShareResult');
+        shareResult.innerHTML = `
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle alert-icon me-2"></i>
+                Document shared successfully with ${shareEmail}
+            </div>
+        `;
+
+        // Clear form and show link
+        document.getElementById('shareEmail').value = '';
+        document.getElementById('shareLink').value = 'https://intellidoc.example.com/share/abc123';
+
+        // Hide result after 3 seconds
+        setTimeout(() => {
+            shareResult.innerHTML = '';
+        }, 3000);
+    }
+
+    // Helper functions
+    function getActivityIcon(type) {
+        const icons = {
+            'upload': 'fas fa-upload',
+            'share': 'fas fa-share-alt',
+            'create': 'fas fa-plus',
+            'delete': 'fas fa-trash-alt',
+            'update': 'fas fa-edit',
+            'ai': 'fas fa-robot'
+        };
+        return icons[type] || 'fas fa-file';
+    }
+
+    function getDocIcon(contentType) {
+        if (!contentType) return 'fas fa-file';
+        const lower = contentType.toLowerCase();
+        if (lower.includes('pdf')) return 'fas fa-file-pdf';
+        if (lower.includes('msword') || lower.includes('word')) return 'fas fa-file-word';
+        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'fas fa-file-excel';
+        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'fas fa-file-powerpoint';
+        if (lower.includes('image')) return 'fas fa-file-image';
+        if (lower.includes('text')) return 'fas fa-file-alt';
+        return 'fas fa-file';
+    }
+
+    function getDocColorClass(contentType) {
+        if (!contentType) return 'purple';
+        const lower = contentType.toLowerCase();
+        if (lower.includes('pdf')) return 'red';
+        if (lower.includes('msword') || lower.includes('word')) return 'blue';
+        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'green';
+        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'orange';
+        if (lower.includes('image')) return 'pink';
+        if (lower.includes('text')) return 'indigo';
+        return 'purple';
+    }
+
+    function getDocTextColorClass(contentType) {
+        if (!contentType) return 'white';
+        const lower = contentType.toLowerCase();
+        if (lower.includes('pdf')) return 'white';
+        if (lower.includes('msword') || lower.includes('word')) return 'white';
+        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'white';
+        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'white';
+        if (lower.includes('image')) return 'white';
+        if (lower.includes('text')) return 'white';
+        return 'white';
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+
+    function formatTimeAgo(timestamp) {
+        if (!timestamp) return '';
+        const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+        let interval = Math.floor(seconds / 31536000);
+
+        if (interval > 1) return interval + " years ago";
+        interval = Math.floor(seconds / 2592000);
+        if (interval > 1) return interval + " months ago";
+        interval = Math.floor(seconds / 86400);
+        if (interval > 1) return interval + " days ago";
+        interval = Math.floor(seconds / 3600);
+        if (interval > 1) return interval + " hours ago";
+        interval = Math.floor(seconds / 60);
+        if (interval > 1) return interval + " minutes ago";
+        return Math.floor(seconds) + " seconds ago";
+    }
+
+    function showError(message) {
+        // Create error alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-error';
+        alertDiv.innerHTML = `
+            <i class="fas fa-times-circle alert-icon me-2"></i>
+            ${message}
+        `;
+
+        const container = document.querySelector('.page-content');
+        if (container) {
+            container.insertBefore(alertDiv, container.firstChild);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+    }
+
+    function showTooltip(element, message) {
+        // Simple tooltip implementation
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.style.position = 'absolute';
+        tooltip.style.backgroundColor = 'var(--neutral-800)';
+        tooltip.style.color = 'var(--neutral-50)';
+        tooltip.style.padding = '0.25rem 0.5rem';
+        tooltip.style.borderRadius = 'var(--radius-sm)';
+        tooltip.style.fontSize = '0.75rem';
+        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.zIndex = 'var(--z-index-tooltip)';
+        tooltip.textContent = message;
+
+        document.body.appendChild(tooltip);
+
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        tooltip.style.top = `${rect.top + window.scrollY - 30}px`;
+
+        // Remove after 1.5 seconds
+        setTimeout(() => {
+            tooltip.remove();
+        }, 1500);
+    }
+</script>
+{% endblock %} class="card-content">
+                    <div class="recent-docs-list" id="recentDocsList">
+                        <!-- Recent documents will be injected here -->
+                        <div class="text-center py-4 text-muted">
+                            No documents yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Analytics -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Document Analytics</h3>
+                </div>
+                <div class="card-content">
+                    <div class="space-y-4">
+                        <!-- File Type Distribution -->
+                        <div>
+                            <h4 class="font-weight-medium mb-2">File Types</h4>
+                            <div id="fileTypeChart" style="height: 180px;"></div>
+                        </div>
+
+                        <!-- Activity Timeline -->
+                        <div>
+                            <h4 class="font-weight-medium mb-2">Activity Timeline</h4>
+                            <div id="activityTimeline" style="height: 180px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row: Notifications & Quick Share -->
+    <div class="grid grid-2 gap-4">
+        <!-- Notifications -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title">Notifications</h3>
+                <a href="#" class="btn btn-outline btn-sm" id="viewAllNotifications">View All</a>
+            </div>
+            <div class="card-content">
+                <div class="notifications-list" id="notificationsList">
+                    <!-- Notifications will be injected here -->
+                    <div class="text-center py-4 text-muted">
+                        No notifications
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Share -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Quick Share</h3>
+            </div>
+            <div class="card-content">
+                <form id="quickShareForm">
+                    <div class="mb-3">
+                        <label class="form-label">Share via Link</label>
+                        <div class="input-group">
+                            <input type="text" id="shareLink" class="form-input" placeholder="Shareable link will appear here..." readonly>
+                            <button type="button" class="btn btn-outline" id="copyLinkBtn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-1">Link expires in 7 days</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email Sharing</label>
+                        <input type="email" id="shareEmail" class="form-input" placeholder="Enter email address">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Permission</label>
+                        <select class="form-input" id="sharePermission">
+                            <option value="view">Can view</option>
+                            <option value="download">Can download</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">
+                        Share Document
+                    </button>
+                </form>
+                <div id="quickShareResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load overview data
+        loadOverviewStats();
+        loadRecentActivity();
+        loadRecentDocuments();
+        loadNotifications();
+        loadStorageInfo();
+        loadAnalytics();
+
+        // Quick create button
+        const quickCreateBtn = document.getElementById('quickCreateBtn');
+        if (quickCreateBtn) {
+            quickCreateBtn.addEventListener('click', function() {
+                document.getElementById('createModal').classList.remove('hidden');
+            });
+        }
+
+        // Copy link button
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', function() {
+                const shareLink = document.getElementById('shareLink');
+                shareLink.select();
+                document.execCommand('copy');
+                showTooltip(copyLinkBtn, 'Link copied!');
+            });
+        }
+
+        // Quick share form
+        const quickShareForm = document.getElementById('quickShareForm');
+        if (quickShareForm) {
+            quickShareForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                handleQuickShare();
+            });
+        }
+
+        // View all notifications
+        const viewAllNotifications = document.getElementById('viewAllNotifications');
+        if (viewAllNotifications) {
+            viewAllNotifications.addEventListener('click', function(e) {
+                e.preventDefault();
+                // TODO: Navigate to notifications page
+                alert('Notifications page coming soon!');
+            });
+        }
+    });
+
+    function loadOverviewStats() {
+        // Fetch stats from API
+        fetch('/api/dashboard/stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalDocuments').textContent = data.total_documents || 0;
+                document.getElementById('totalFolders').textContent = data.total_folders || 0;
+                document.getElementById('sharedDocuments').textContent = data.shared_documents || 0;
+                document.getElementById('aiProcessed').textContent = data.ai_processed || 0;
+            })
+            .catch(error => {
+                console.error('Error loading stats:', error);
+                // Set default values
+                document.getElementById('totalDocuments').textContent = '0';
+                document.getElementById('totalFolders').textContent = '0';
+                document.getElementById('sharedDocuments').textContent = '0';
+                document.getElementById('aiProcessed').textContent = '0';
+            });
+    }
+
+    function loadRecentActivity() {
+        // Fetch recent activity from API
+        const activityList = document.getElementById('activityList');
+        if (!activityList) return;
+
+        fetch('/api/dashboard/activity')
+            .then(response => response.json())
+            .then(data => {
+                if (data.length === 0) {
+                    activityList.innerHTML = '<div class="text-center py-4 text-muted">No recent activity</div>';
+                    return;
+                }
+
+                activityList.innerHTML = data.map(activity => `
+                    <div class="activity-item d-flex align-items-start mb-3">
+                        <div class="flex-shrink-0">
+                            <div class="activity-icon bg-purple-light text-purple rounded-circle">
+                                <i class="${getActivityIcon(activity.type)}"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="activity-content">
+                                <div class="activity-title font-weight-medium">${activity.title}</div>
+                                <div class="activity-description text-muted small">${activity.description}</div>
+                                <div class="activity-time text-muted small">${formatTimeAgo(activity.timestamp)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    `).join('');
+            })
+            .catch(error => {
+                console.error('Error loading activity:', error);
+                activityList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load activity</div>';
+            });
+    }
+
+    function loadRecentDocuments() {
+        // Fetch recent documents from API
+        const recentDocsList = document.getElementById('recentDocsList');
+        if (!recentDocsList) return;
+
+        fetch('/api/documents?limit=5&sort=date_desc')
+            .then(response => response.json())
+            .then(data => {
+                const documents = data.documents || [];
+                if (documents.length === 0) {
+                    recentDocsList.innerHTML = '<div class="text-center py-4 text-muted">No documents yet</div>';
+                    return;
+                }
+
+                recentDocsList.innerHTML = documents.map(doc => `
+                    <div class="recent-doc-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
+                        <div class="flex-shrink-0">
+                            <div class="doc-icon bg-${getDocColorClass(doc.content_type)} text-${getDocTextColorClass(doc.content_type)} rounded-circle">
+                                <i class="${getDocIcon(doc.content_type)}"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="doc-title font-weight-medium">${doc.filename || 'Untitled'}</div>
+                            <div class="doc-meta text-muted small d-flex justify-content-between">
+                                <span>${formatFileSize(doc.size)}</span>
+                                <span>${formatDate(doc.CreatedAt)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    `).join('');
+            })
+            .catch(error => {
+                console.error('Error loading recent documents:', error);
+                recentDocsList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load documents</div>';
+            });
+    }
+
+    function loadNotifications() {
+        // Fetch notifications from API
+        const notificationsList = document.getElementById('notificationsList');
+        if (!notificationsList) return;
+
+        // Mock data for now
+        notificationsList.innerHTML = `
+            <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
+                <div class="flex-shrink-0">
+                    <div class="notification-icon bg-info-light text-info rounded-circle">
+                        <i class="fas fa-info-circle"></i>
+                    </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <div class="notification-title font-weight-medium">Welcome to IntelliDoc</div>
+                    <div class="notification-text text-muted small">Your document management system is ready to use</div>
+                    <div class="notification-time text-muted small">Just now</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function loadStorageInfo() {
+        // Mock storage data for now
+        document.getElementById('storageDocuments').textContent = '12 GB';
+        document.getElementById('storageProgress').style.width = '65%';
+        document.getElementById('storageUsed').textContent = '65 GB';
+        document.getElementById('storageFree').textContent = '35 GB';
+    }
+
+    function loadAnalytics() {
+        // Load charts (simplified for now)
+        // In a real implementation, you would use Chart.js or similar
+        const fileTypeChart = document.getElementById('fileTypeChart');
+        if (fileTypeChart) {
+            fileTypeChart.innerHTML = '<div class="text-center py-4 text-muted">File type distribution chart</div>';
+        }
+
+        const activityTimeline = document.getElementById('activityTimeline');
+        if (activityTimeline) {
+            activityTimeline.innerHTML = '<div class="text-center py-4 text-muted">Activity timeline chart</div>';
+        }
+    }
+
+    function handleQuickShare() {
+        const shareEmail = document.getElementById('shareEmail').value.trim();
+        const sharePermission = document.getElementById('sharePermission').value;
+
+        if (!shareEmail) {
+            showError('Please enter an email address');
+            return;
+        }
+
+        // Simulate sharing
+        const shareResult = document.getElementById('quickShareResult');
+        shareResult.innerHTML = `
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle alert-icon me-2"></i>
+                Document shared successfully with ${shareEmail}
+            </div>
+        `;
+
+        // Clear form and show link
+        document.getElementById('shareEmail').value = '';
+        document.getElementById('shareLink').value = 'https://intellidoc.example.com/share/abc123';
+
+        // Hide result after 3 seconds
+        setTimeout(() => {
+            shareResult.innerHTML = '';
+        }, 3000);
+    }
+
+    // Helper functions
+    function getActivityIcon(type) {
+        const icons = {
+            'upload': 'fas fa-upload',
+            'share': 'fas fa-share-alt',
+            'create': 'fas fa-plus',
+            'delete': 'fas fa-trash-alt',
+            'update': 'fas fa-edit',
+            'ai': 'fas fa-robot'
+        };
+        return icons[type] || 'fas fa-file';
+    }
+
+    function getDocIcon(contentType) {
+        if (!contentType) return 'fas fa-file';
+        const lower = contentType.toLowerCase();
+        if (lower.includes('pdf')) return 'fas fa-file-pdf';
+        if (lower.includes('msword') || lower.includes('word')) return 'fas fa-file-word';
+        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'fas fa-file-excel';
+        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'fas fa-file-powerpoint';
+        if (lower.includes('image')) return 'fas fa-file-image';
+        if (lower.includes('text')) return 'fas fa-file-alt';
+        return 'fas fa-file';
+    }
+
+    function getDocColorClass(contentType) {
+        if (!contentType) return 'purple';
+        const lower = contentType.toLowerCase();
+        if (lower.includes('pdf')) return 'red';
+        if (lower.includes('msword') || lower.includes('word')) return 'blue';
+        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'green';
+        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'orange';
+        if (lower.includes('image')) return 'pink';
+        if (lower.includes('text')) return 'indigo';
+        return 'purple';
+    }
+
+    function getDocTextColorClass(contentType) {
+        if (!contentType) return 'white';
+        const lower = contentType.toLowerCase();
+        if (lower.includes('pdf')) return 'white';
+        if (lower.includes('msword') || lower.includes('word')) return 'white';
+        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'white';
+        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'white';
+        if (lower.includes('image')) return 'white';
+        if (lower.includes('text')) return 'white';
+        return 'white';
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+
+    function formatTimeAgo(timestamp) {
+        if (!timestamp) return '';
+        const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+        let interval = Math.floor(seconds / 31536000);
+
+        if (interval > 1) return interval + " years ago";
+        interval = Math.floor(seconds / 2592000);
+        if (interval > 1) return interval + " months ago";
+        interval = Math.floor(seconds / 86400);
+        if (interval > 1) return interval + " days ago";
+        interval = Math.floor(seconds / 3600);
+        if (interval > 1) return interval + " hours ago";
+        interval = Math.floor(seconds / 60);
+        if (interval > 1) return interval + " minutes ago";
+        return Math.floor(seconds) + " seconds ago";
+    }
+
+    function showError(message) {
+        // Create error alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-error';
+        alertDiv.innerHTML = `
+            <i class="fas fa-times-circle alert-icon me-2"></i>
+            ${message}
+        `;
+
+        const container = document.querySelector('.page-content');
+        if (container) {
+            container.insertBefore(alertDiv, container.firstChild);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+    }
+
+    function showTooltip(element, message) {
+        // Simple tooltip implementation
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.style.position = 'absolute';
+        tooltip.style.backgroundColor = 'var(--neutral-800)';
+        tooltip.style.color = 'var(--neutral-50)';
+        tooltip.style.padding = '0.25rem 0.5rem';
+        tooltip.style.borderRadius = 'var(--radius-sm)';
+        tooltip.style.fontSize = '0.75rem';
+        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.zIndex = 'var(--z-index-tooltip)';
+        tooltip.textContent = message;
+
+        document.body.appendChild(tooltip);
+
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        tooltip.style.top = `${rect.top + window.scrollY - 30}px`;
+
+        // Remove after 1.5 seconds
+        setTimeout(() => {
+            tooltip.remove();
+        }, 1500);
+    }
+</script>
+{% endblock %}

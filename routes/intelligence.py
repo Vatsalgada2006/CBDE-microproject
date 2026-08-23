@@ -139,6 +139,31 @@ def get_dashboard_data():
     recent_docs = sorted(documents, key=lambda d: d.CreatedAt if d.CreatedAt else datetime.min, reverse=True)[:5]
     recent_docs_data = [doc.to_dict() for doc in recent_docs]
 
+    # Get folder count
+    folder_service = None
+    try:
+        from services.folder_service import FolderService
+        folder_service = FolderService()
+        folders = folder_service.list_folders_by_owner(user_id)
+        total_folders = len(folders)
+    except Exception as e:
+        print(f"Error getting folder count: {e}")
+        total_folders = 0
+
+    # Get shared documents count (documents shared with the user)
+    share_service = None
+    try:
+        from services.share_service import ShareService
+        share_service = ShareService()
+        shares = share_service.list_shares_shared_with(user_id)
+        total_shared = len(shares)
+    except Exception as e:
+        print(f"Error getting shared count: {e}")
+        total_shared = 0
+
+    # Count documents that have been processed by AI (intelligence status completed)
+    ai_processed = len([doc for doc in documents if hasattr(doc, 'intelligence_status') and doc.intelligence_status == 'completed'])
+
     # Count duplicates and versions (we would need to query the relationships collection)
     # For simplicity, we'll skip this for now and just return zeros.
     duplicate_count = 0
@@ -147,6 +172,9 @@ def get_dashboard_data():
 
     dashboard_data = {
         'total_documents': total_docs,
+        'total_folders': total_folders,
+        'total_shared': total_shared,
+        'ai_processed': ai_processed,
         'total_size_bytes': total_size,
         'extraction_status_counts': status_counts['extraction'],
         'intelligence_status_counts': status_counts['intelligence'],
