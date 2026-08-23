@@ -358,17 +358,21 @@
             fetch('/intelligence/dashboard/data').then(res => res.json()),
             fetch(`/sharing/`).then(res => res.json()).then(data => {
                 // Filter shares where the current user is the recipient
-                const allShares = data.shares || [];
-                return allShares.filter(share => share.shared_with_id === window.userData.uid);
-            }).catch(() => []))
+                // Only fetch shares if user is logged in
+                if (window.userData && window.userData.uid) {
+                    const allShares = data.shares || [];
+                    return allShares.filter(share => share.shared_with_id === window.userData.uid);
+                }
+                return []; // Return empty array if not logged in
         ])
         .then(([dashboardData, sharesData]) => {
             const documents = dashboardData.recent_documents || [];
             const shares = sharesData || [];
             let notificationsHTML = '';
 
-            // Add share notifications
-            if (shares.length > 0) {
+            // Add share notifications (only if user is logged in)
+            // Add share notifications (only if user is logged in)
+            if (window.userData && window.userData.uid && shares.length > 0) {
                 notificationsHTML += shares.map(share => `
                     <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
                         <div class="flex-shrink-0">

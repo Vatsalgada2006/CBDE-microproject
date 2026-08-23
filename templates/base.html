@@ -13,7 +13,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Expose user data to JavaScript -->
     <script>
+        {% if request.user %}
         window.userData = {{ request.user | tojson | safe }};
+        {% else %}
+        window.userData = null;
+        {% endif %}
     </script>
 </head>
 <body>
