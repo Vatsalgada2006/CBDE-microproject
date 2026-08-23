@@ -86,7 +86,7 @@ class DocumentService:
     def __init__(self):
         # Use mock Firestore if Firebase is not initialized
         if _firebase_initialized:
-            self.db = firestore.client()
+            self.db = firestore_db
             self.collection = self.db.collection('documents')
         else:
             self.db = MockFirestore()

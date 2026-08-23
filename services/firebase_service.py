@@ -158,6 +158,37 @@ def initialize_firebase():
         _firebase_initialized = False
 
 # Initialize Firebase when this module is loaded
+firebase_app = None
+
+def initialize_firebase():
+    global _firebase_initialized, firebase_app
+    try:
+        if not firebase_admin._apps:
+            cred = credentials.Certificate({
+                "type": "service_account",
+                "project_id": Config.FIREBASE_PROJECT_ID,
+                "private_key_id": Config.FIREBASE_PRIVATE_KEY_ID or "",
+                "private_key": (Config.FIREBASE_PRIVATE_KEY or "").strip().replace('\\n', '\n'),
+                "client_email": Config.FIREBASE_CLIENT_EMAIL,
+                "client_id": Config.FIREBASE_CLIENT_ID or "",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{Config.FIREBASE_CLIENT_EMAIL.replace('@', '%40')}" if Config.FIREBASE_CLIENT_EMAIL else ""
+            })
+            firebase_app = firebase_admin.initialize_app(cred, {
+                'storageBucket': Config.FIREBASE_STORAGE_BUCKET
+            })
+            _firebase_initialized = True
+        else:
+            firebase_app = firebase_admin.get_app()
+            _firebase_initialized = True
+    except Exception as e:
+        print(f"Warning: Failed to initialize Firebase Admin SDK: {e}")
+        _firebase_initialized = False
+        firebase_app = None
+
+# Initialize Firebase when this module is loaded
 initialize_firebase()
 
 
@@ -170,8 +201,8 @@ else:
 
 # Initialize Firestore and Storage clients or mocks
 if _firebase_initialized:
-    firestore_db = firestore.client()
-    storage_bucket = storage.bucket()
+    firestore_db = firestore.client(firebase_app)
+    storage_bucket = storage.bucket(firebase_app)
 else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
