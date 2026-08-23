@@ -171,7 +171,7 @@ else:
 # Initialize Firestore and Storage clients or mocks
 if _firebase_initialized:
     firestore_db = firestore.client()
-    storage_bucket = storage.bucket(Config.FIREBASE_STORAGE_BUCKET)
+    storage_bucket = storage.bucket()
 else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
