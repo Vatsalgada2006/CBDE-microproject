@@ -189,7 +189,12 @@ if _firebase_initialized:
     if Config.FIREBASE_STORAGE_BUCKET:
         storage_bucket = storage.bucket(Config.FIREBASE_STORAGE_BUCKET)
     else:
-        storage_bucket = storage.bucket()
+        # Firebase is initialized but storage bucket is not configured
+        # This is a configuration error - storage is required for document management
+        raise ValueError(
+            "FIREBASE_STORAGE_BUCKET environment variable is not set. "
+            "Firebase Storage bucket name is required for document storage functionality."
+        )
 else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
