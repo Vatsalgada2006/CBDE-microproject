@@ -159,9 +159,10 @@ def initialize_firebase():
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
                 "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{Config.FIREBASE_CLIENT_EMAIL.replace('@', '%40')}" if Config.FIREBASE_CLIENT_EMAIL else ""
             })
-            firebase_app = firebase_admin.initialize_app(cred, {
-                'storageBucket': Config.FIREBASE_STORAGE_BUCKET
-            })
+            options = {}
+            if Config.FIREBASE_STORAGE_BUCKET:
+                options['storageBucket'] = Config.FIREBASE_STORAGE_BUCKET
+            firebase_app = firebase_admin.initialize_app(cred, options)
             _firebase_initialized = True
         else:
             firebase_app = firebase_admin.get_app()
@@ -185,7 +186,10 @@ else:
 # Initialize Firestore and Storage clients or mocks
 if _firebase_initialized:
     firestore_db = firestore.client(firebase_app)
-    storage_bucket = storage.bucket()
+    if Config.FIREBASE_STORAGE_BUCKET:
+        storage_bucket = storage.bucket(Config.FIREBASE_STORAGE_BUCKET)
+    else:
+        storage_bucket = storage.bucket()
 else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
