@@ -78,6 +78,13 @@ class MockDocument:
     def to_dict(self):
         return self.data
 
+    def get(self):
+        from types import SimpleNamespace
+        mock_doc = SimpleNamespace()
+        mock_doc.exists = bool(self.data)
+        mock_doc.to_dict = lambda: self.data
+        return mock_doc
+
     def delete(self):
         # Mock delete
         self.data = {}
@@ -188,7 +195,10 @@ class DocumentService:
 
             # Get total count for pagination
             # Note: This is inefficient for large collections - in a real app, you'd maintain a count
+            # Build count query by reusing the same filter logic
             count_query = self.collection.where('owner_id', '==', owner_id)
+
+            # Apply the same filters to count query
             if search_query:
                 count_query = count_query.where('filename', '>=', search_query).where('filename', '<=', search_query + '')
             if file_type != 'all':
@@ -204,6 +214,8 @@ class DocumentService:
                 elif file_type == 'text':
                     count_query = count_query.where('content_type', '>=', 'text/').where('content_type', '<', 'text/')
 
+            # For Firestore, we need to execute the query to get count
+            # In a production app with large datasets, consider maintaining a count field
             total_docs = len(list(count_query.stream()))
             total_pages = math.ceil(total_docs / limit) if total_docs > 0 else 1
 

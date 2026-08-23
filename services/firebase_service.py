@@ -57,6 +57,15 @@ class MockCollection:
         # For simplicity, we'll ignore limit in mock
         # In a more advanced mock, we could store the limit
         return self
+
+    def offset(self, offset_val):
+        # For simplicity, we'll ignore offset in mock
+        # In a more advanced mock, we could store the offset
+        return self
+
+    def order_by(self, field, direction=None):
+        # For simplicity, we'll ignore order_by in mock
+        return self
     
     def stream(self):
         # Return all documents as mock snapshots
@@ -121,7 +130,7 @@ class MockBlob:
     def download_as_string(self):
         return self.content or b""
     
-    def generate_signed_request(self, method, expiration, headers=None):
+    def generate_signed_url(self, method, expiration, headers=None):
         # Return a mock signed URL
         return f"https://storage.mock/{self.path}?signed=true"
     
@@ -132,32 +141,6 @@ class MockBlob:
 
 # Flag to track if Firebase is initialized
 _firebase_initialized = False
-
-def initialize_firebase():
-    global _firebase_initialized, firestore_db, storage_bucket
-    try:
-        if not firebase_admin._apps:
-            cred = credentials.Certificate({
-                "type": "service_account",
-                "project_id": Config.FIREBASE_PROJECT_ID,
-                "private_key_id": Config.FIREBASE_PRIVATE_KEY_ID or "",
-                "private_key": (Config.FIREBASE_PRIVATE_KEY or "").strip().replace('\\n', '\n'),
-                "client_email": Config.FIREBASE_CLIENT_EMAIL,
-                "client_id": Config.FIREBASE_CLIENT_ID or "",
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{Config.FIREBASE_CLIENT_EMAIL.replace('@', '%40')}" if Config.FIREBASE_CLIENT_EMAIL else ""
-            })
-            firebase_admin.initialize_app(cred, {
-                'storageBucket': Config.FIREBASE_STORAGE_BUCKET
-            })
-            _firebase_initialized = True
-    except Exception as e:
-        print(f"Warning: Failed to initialize Firebase Admin SDK: {e}")
-        _firebase_initialized = False
-
-# Initialize Firebase when this module is loaded
 firebase_app = None
 
 def initialize_firebase():
