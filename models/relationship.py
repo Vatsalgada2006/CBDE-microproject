@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 class Relationship:
@@ -12,7 +12,7 @@ class Relationship:
         self.relationship_type = relationship_type  # e.g., 'related', 'possible_duplicate', 'possible_previous_version', etc.
         self.confidence = confidence
         self.reason = reason
-        self.CreatedAt = CreatedAt or datetime.utcnow()
+        self.CreatedAt = CreatedAt or datetime.now(timezone.utc)
 
     def to_dict(self):
         return {

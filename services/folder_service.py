@@ -1,7 +1,7 @@
 from typing import Optional, List
 from services.firebase_service import firestore_db
 from models.folder import Folder
-from datetime import datetime
+from datetime import datetime, timezone
 
 class FolderService:
     def __init__(self):
@@ -15,7 +15,7 @@ class FolderService:
             folder.folder_id = folder_ref.id
         else:
             folder_ref = self.collection.document(folder.folder_id)
-        folder.UpdatedAt = datetime.utcnow()
+        folder.UpdatedAt = datetime.now(timezone.utc)
         folder_ref.set(folder.to_dict())
         return folder
 
@@ -31,7 +31,7 @@ class FolderService:
         """Update an existing folder."""
         if not folder.folder_id:
             raise ValueError("Folder ID is required for update")
-        folder.UpdatedAt = datetime.utcnow()
+        folder.UpdatedAt = datetime.now(timezone.utc)
         folder_ref = self.collection.document(folder.folder_id)
         folder_ref.update(folder.to_dict())
         return folder

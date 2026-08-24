@@ -1,6 +1,9 @@
+import logging
 from flask import Blueprint, request, jsonify, render_template
 from routes.auth import token_required
-from datetime import datetime
+from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 intelligence_bp = Blueprint('intelligence', __name__)
 
@@ -147,7 +150,7 @@ def get_dashboard_data():
         folders = folder_service.list_folders_by_owner(user_id)
         total_folders = len(folders)
     except Exception as e:
-        print(f"Error getting folder count: {e}")
+        logger.error(f"Error getting folder count: {e}")
         total_folders = 0
 
     # Get shared documents count (documents shared with the user)
@@ -158,7 +161,7 @@ def get_dashboard_data():
         shares = share_service.list_shares_shared_with(user_id)
         total_shared = len(shares)
     except Exception as e:
-        print(f"Error getting shared count: {e}")
+        logger.error(f"Error getting shared count: {e}")
         total_shared = 0
 
     # Count documents that have been processed by AI (intelligence status completed)
@@ -262,4 +265,38 @@ def get_document_insights(doc_id):
     intelligence_service = get_intelligence_service()
     insights = intelligence_service.get_document_insights(doc_id)
 
-    return jsonify(insights), 200
+    return jsonify(insights)
+
+
+@intelligence_bp.route('/ask/<doc_id>', methods=['POST'])
+@token_required
+def ask_document_question(doc_id):
+    """
+    Ask a question about a document.
+    Expects JSON: { "question": "your question here" }
+    """
+    # Verify that the document exists and the user has access
+    document_service = get_document_service()
+    document = document_service.get_document(doc_id)
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+
+    # Check access
+    from routes.documents import check_document_access
+    if not check_document_access(document, request.user['uid']):
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Get the question from the request
+    data = request.get_json()
+    if not data or 'question' not in data:
+        return jsonify({'error': 'Question is required'}), 400
+
+    question = data['question']
+    if not question or not question.strip():
+        return jsonify({'error': 'Question cannot be empty'}), 400
+
+    # Get answer from intelligence service
+    intelligence_service = get_intelligence_service()
+    result = intelligence_service.ask_document_question(doc_id, question.strip())
+
+    return jsonify(result), 200

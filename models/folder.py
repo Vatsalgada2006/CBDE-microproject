@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 class Folder:
@@ -9,8 +9,8 @@ class Folder:
         self.owner_id = owner_id
         self.name = name
         self.parent_id = parent_id  # For subfolders
-        self.CreatedAt = CreatedAt or datetime.utcnow()
-        self.UpdatedAt = UpdatedAt or datetime.utcnow()
+        self.CreatedAt = CreatedAt or datetime.now(timezone.utc)
+        self.UpdatedAt = UpdatedAt or datetime.now(timezone.utc)
 
     def to_dict(self):
         return {

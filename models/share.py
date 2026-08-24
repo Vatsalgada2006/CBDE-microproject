@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 class Share:
@@ -11,7 +11,7 @@ class Share:
         self.owner_id = owner_id
         self.shared_with_id = shared_with_id  # The user ID with whom the document is shared
         self.permission = permission
-        self.CreatedAt = CreatedAt or datetime.utcnow()
+        self.CreatedAt = CreatedAt or datetime.now(timezone.utc)
 
     def to_dict(self):
         return {

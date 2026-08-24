@@ -1,3 +1,4 @@
+import logging
 from flask import Blueprint, request, jsonify, send_file, render_template
 from services.firebase_service import auth
 from services.document_service import DocumentService
@@ -6,9 +7,30 @@ from services.share_service import ShareService
 from models.document import Document
 import hashlib
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from mimetypes import guess_type
 from routes.auth import token_required
+
+logger = logging.getLogger(__name__)
+
+# Allowed file types for upload
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx'}
+ALLOWED_MIME_TYPES = {
+    'text/plain',
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+}
+
+def allowed_file(filename):
+    """Check if the file has an allowed extension."""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 documents_bp = Blueprint('documents', __name__)
 document_service = DocumentService()
@@ -36,13 +58,17 @@ def upload_document():
     Upload a new document.
     Expects a multipart/form-data with a 'file' field.
     """
-    print("Upload endpoint called")  # Debug
+    logger.info("Upload endpoint called")
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
 
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
+
+    # Check if file type is allowed
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'File type not allowed. Please upload a valid document type.'}), 400
 
     # Get the current user from the request (set by token_required decorator)
     owner_id = request.user['uid']
@@ -64,9 +90,9 @@ def upload_document():
         storage_url, storage_path = storage_service.upload_file(
             file_data, file.filename, content_type=content_type
         )
-        print(f"Storage upload successful: {storage_path}")  # Debug
+        logger.info(f"Storage upload successful: {storage_path}")
     except Exception as e:
-        print(f"Error uploading to storage: {e}")
+        logger.error(f"Error uploading to storage: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Failed to upload file'}), 500
@@ -82,14 +108,14 @@ def upload_document():
         extraction_status="pending",
         intelligence_status="pending"
     )
-    print(f"Document metadata: {document.to_dict()}")  # Debug
+    logger.debug(f"Document metadata: {document.to_dict()}")
 
     # Save document metadata to Firestore
     try:
         document = document_service.create_document(document)
-        print(f"Document saved successfully: {document.doc_id}")  # Debug
+        logger.info(f"Document saved successfully: {document.doc_id}")
     except Exception as e:
-        print(f"Error creating document record: {e}")
+        logger.error(f"Error creating document record: {e}")
         import traceback
         traceback.print_exc()
         # TODO: Optionally delete the uploaded file from storage
@@ -112,7 +138,7 @@ def upload_document():
         # Clean up the temporary file
         os.unlink(tmp_file_path)
     except Exception as e:
-        print(f"Error during intelligence processing: {e}")
+        logger.error(f"Error during intelligence processing: {e}")
         import traceback
         traceback.print_exc()
         # We don't want to fail the upload if intelligence processing fails
@@ -158,7 +184,7 @@ def download_document(doc_id):
         blob = storage_service.bucket.blob(document.storage_path)
         file_data = blob.download_as_string()
     except Exception as e:
-        print(f"Error downloading file from storage: {e}")
+        logger.error(f"Error downloading file from storage: {e}")
         return jsonify({'error': 'Failed to download file'}), 500
 
     # Return the file as a downloadable response
@@ -194,12 +220,12 @@ def update_document(doc_id):
         if field in data:
             setattr(document, field, data[field])
 
-    document.UpdatedAt = datetime.utcnow()
+    document.UpdatedAt = datetime.now(timezone.utc)
 
     try:
         document = document_service.update_document(document)
     except Exception as e:
-        print(f"Error updating document: {e}")
+        logger.error(f"Error updating document: {e}")
         return jsonify({'error': 'Failed to update document'}), 500
 
     return jsonify({
@@ -225,7 +251,7 @@ def delete_document(doc_id):
     try:
         storage_service.delete_file(document.storage_path)
     except Exception as e:
-        print(f"Error deleting file from storage: {e}")
+        logger.error(f"Error deleting file from storage: {e}")
         # We might still want to delete the metadata, but log the error
         pass
 
@@ -233,7 +259,7 @@ def delete_document(doc_id):
     try:
         document_service.delete_document(doc_id)
     except Exception as e:
-        print(f"Error deleting document metadata: {e}")
+        logger.error(f"Error deleting document metadata: {e}")
         return jsonify({'error': 'Failed to delete document metadata'}), 500
 
     return jsonify({'message': 'Document deleted successfully'}), 200
@@ -297,7 +323,7 @@ def share_document(doc_id):
         share_service.share_document(document.doc_id, request.user['uid'], email, permission)
         return jsonify({'message': 'Document shared successfully'}), 200
     except Exception as e:
-        print(f"Error sharing document: {e}")
+        logger.error(f"Error sharing document: {e}")
         return jsonify({'error': 'Failed to share document'}), 500
 
 # HTML Rendering Routes

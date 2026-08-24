@@ -22,6 +22,11 @@ def create_share():
 
     document_id = data['document_id']
     shared_with_id = data['shared_with_email']  # In a real app, we would map email to UID
+
+    # Validate user ID is not empty
+    if not shared_with_id or not shared_with_id.strip():
+        return jsonify({'error': 'User ID is required'}), 400
+
     permission = data.get('permission', 'view')
 
     # Validate permission

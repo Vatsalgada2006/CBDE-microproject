@@ -1,9 +1,12 @@
+import logging
 from firebase_admin import firestore
 from services.firebase_service import _firebase_initialized, firestore_db
 from models.document import Document
 from typing import List, Optional, Dict
 import math
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 # Mock Firestore for when Firebase is not initialized
 class MockFirestore:
@@ -147,7 +150,7 @@ class DocumentService:
             for doc in query.stream():
                 docs.append(Document.from_dict(doc.to_dict()))
         except Exception as e:
-            print(f"Error listing documents: {e}")
+            logger.error(f"Error listing documents: {e}")
         return docs
 
     def list_documents_by_owner_with_filters(self, owner_id: str, search_query: str = '', file_type: str = 'all', sort_by: str = 'date_desc', page: int = 1, limit: int = 12, folder_id: Optional[str] = None) -> Dict:
@@ -242,7 +245,7 @@ class DocumentService:
                 }
             }
         except Exception as e:
-            print(f"Error listing documents with filters: {e}")
+            logger.error(f"Error listing documents with filters: {e}")
             return {
                 'documents': [],
                 'pagination': {
@@ -262,5 +265,5 @@ class DocumentService:
             for doc in query.stream():
                 docs.append(Document.from_dict(doc.to_dict()))
         except Exception as e:
-            print(f"Error listing documents by folder: {e}")
+            logger.error(f"Error listing documents by folder: {e}")
         return docs

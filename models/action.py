@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 class Action:
@@ -12,7 +12,7 @@ class Action:
         self.deadline = deadline
         self.action_type = action_type  # 'task' or 'deadline'
         self.confidence = confidence
-        self.CreatedAt = CreatedAt or datetime.utcnow()
+        self.CreatedAt = CreatedAt or datetime.now(timezone.utc)
 
     def to_dict(self):
         return {

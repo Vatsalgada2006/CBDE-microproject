@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 class Document:
@@ -13,8 +13,8 @@ class Document:
         self.content_type = content_type
         self.size = size
         self.storage_path = storage_path
-        self.CreatedAt = CreatedAt or datetime.utcnow()
-        self.UpdatedAt = UpdatedAt or datetime.utcnow()
+        self.CreatedAt = CreatedAt or datetime.now(timezone.utc)
+        self.UpdatedAt = UpdatedAt or datetime.now(timezone.utc)
         self.folder_id = folder_id
         self.tags = tags or []  # list of tags associated with the document
         self.extraction_status = extraction_status  # pending, processing, completed, failed

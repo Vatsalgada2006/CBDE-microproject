@@ -1,11 +1,24 @@
+import logging
 from flask import Blueprint, request, jsonify
 from services.firebase_service import auth, verify_firebase_token
 from services.user_service import UserService
 from models.user import User
 from functools import wraps
 
+logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__)
 user_service = UserService()
+
+def is_valid_email(email):
+    """Basic email format validation."""
+    import re
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def is_valid_password(password):
+    """Basic password strength validation."""
+    # At least 8 characters
+    return len(password) >= 8
 
 def token_required(f):
     @wraps(f)
@@ -43,7 +56,7 @@ def register():
     Register a new user with email and password.
     Expects JSON: { "email": "user@example.com", "password": "password", "display_name": "Optional Name" }
     """
-    print("Register endpoint called")  # Debug print
+    logger.info("Register endpoint called")
     data = request.get_json()
     if not data or 'email' not in data or 'password' not in data:
         return jsonify({'error': 'Email and password are required'}), 400
@@ -52,9 +65,17 @@ def register():
     password = data['password']
     display_name = data.get('display_name', email.split('@')[0])
 
+    # Validate email format
+    if not is_valid_email(email):
+        return jsonify({'error': 'Invalid email format'}), 400
+
+    # Validate password strength
+    if not is_valid_password(password):
+        return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+
     try:
         # Create user in Firebase Authentication
-        print(f"Creating Firebase user for email: {email}")  # Debug print
+        logger.info(f"Creating Firebase user for email: {email}")
         user_record = auth.create_user(
             email=email,
             email_verified=False,
@@ -62,7 +83,7 @@ def register():
             display_name=display_name,
             disabled=False
         )
-        print(f"Firebase user created: {user_record.uid}")  # Debug print
+        logger.info(f"Firebase user created: {user_record.uid}")
 
         # Create user document in Firestore
         user = User(
@@ -70,9 +91,9 @@ def register():
             email=email,
             display_name=display_name
         )
-        print(f"Creating user in Firestore: {user.to_dict()}")  # Debug print
+        logger.info(f"Creating user in Firestore: {user.to_dict()}")
         user_service.create_user(user)
-        print(f"User created in Firestore")  # Debug print
+        logger.info("User created in Firestore")
 
         return jsonify({
             'message': 'User created successfully',
@@ -82,7 +103,7 @@ def register():
         }), 201
 
     except Exception as e:
-        print(f"Error in register endpoint: {e}")  # Debug print
+        logger.error(f"Error in register endpoint: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 400

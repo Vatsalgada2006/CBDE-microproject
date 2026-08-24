@@ -1,6 +1,6 @@
 from services.firebase_service import firestore_db
 from models.share import Share
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 class ShareService:
@@ -15,7 +15,7 @@ class ShareService:
             share.share_id = share_ref.id
         else:
             share_ref = self.collection.document(share.share_id)
-        share.CreatedAt = datetime.utcnow()
+        share.CreatedAt = datetime.now(timezone.utc)
         share_ref.set(share.to_dict())
         return share
 
@@ -31,7 +31,7 @@ class ShareService:
         """Update an existing share."""
         if not share.share_id:
             raise ValueError("Share ID is required for update")
-        share.CreatedAt = datetime.utcnow()
+        share.CreatedAt = datetime.now(timezone.utc)
         share_ref = self.collection.document(share.share_id)
         share_ref.update(share.to_dict())
         return share
