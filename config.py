@@ -1,10 +1,20 @@
 import os
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()  # Load environment variables from .env
 
 class Config:
-    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY') or 'you-will-never-guess'
+    ENV = os.getenv('FLASK_ENV', 'production')
+    DEBUG = ENV == 'development'
+    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
+    if not SECRET_KEY:
+        if DEBUG:
+            SECRET_KEY = 'dev-secret-key-change-me'
+            logging.warning('Using default SECRET_KEY for development. Set FLASK_SECRET_KEY in production.')
+        else:
+            raise RuntimeError('SECRET_KEY must be set in production environment.')
+
     # Firebase configuration
     FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID')
     FIREBASE_CLIENT_EMAIL = os.environ.get('FIREBASE_CLIENT_EMAIL')
@@ -15,3 +25,8 @@ class Config:
 
     # Other settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB upload limit
+
+    # Session cookie settings
+    SESSION_COOKIE_SECURE = not DEBUG
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'

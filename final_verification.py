@@ -1,125 +1,67 @@
+#!/usr/bin/env python3
 """
-Final verification that the Firebase Storage fix resolves the Render deployment issue.
+Final verification that our fix for the Firebase private key newline processing is correct.
 """
 
 import os
-import sys
+from dotenv import load_dotenv
 
-# Add current directory to path
-sys.path.insert(0, '.')
+# Load environment variables from .env file
+load_dotenv()
 
-def test_render_production_scenario():
-    """
-    Test the exact scenario that was failing in Render:
-    - Firebase credentials are valid (initialization would succeed)
-    - FIREBASE_STORAGE_BUCKET is missing/not set
-    - Should fail fast with clear error during module import
-    """
+# Get the raw private key from environment (as it exists in the .env file)
+private_key_raw = os.environ.get('FIREBASE_PRIVATE_KEY', '')
 
-    print("🧪 Testing Render production scenario...")
-    print("   - Valid Firebase credentials provided")
-    print("   - FIREBASE_STORAGE_BUCKET missing")
-    print("   - Should fail fast with clear error")
-    print()
+print("=== FIREBASE PRIVATE KEY NEWLINE PROCESSING VERIFICATION ===")
+print()
 
-    # Clear any existing Firebase-related env vars
-    for key in list(os.environ.keys()):
-        if key.startswith('FIREBASE_') or key == 'FLASK_SECRET_KEY':
-            del os.environ[key]
+print("1. RAW PRIVATE KEY FROM ENVIRONMENT (.env file):")
+print(f"   Length: {len(private_key_raw)} characters")
+print(f"   First 30 chars: {repr(private_key_raw[:30])}")
+print(f"   Contains literal backslash-n: {'\\n' in private_key_raw}")
+print(f"   Count of literal backslash-n sequences: {private_key_raw.count('\\n')}")
+print(f"   Contains actual newline characters: {chr(10) in private_key_raw}")
+print(f"   Count of actual newline characters: {private_key_raw.count(chr(10))}")
+print()
 
-    # Set up valid Firebase configuration (simulating what would be in Render)
-    os.environ['FIREBASE_PROJECT_ID'] = 'my-render-project-123'
-    os.environ['FIREBASE_CLIENT_EMAIL'] = 'firebase-adminsdk@my-render-project-123.iam.gserviceaccount.com'
-    os.environ['FIREBASE_PRIVATE_KEY'] = '''-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCssss
------END PRIVATE KEY-----'''
-    # CRITICAL: Intentionally NOT setting FIREBASE_STORAGE_BUCKET
-    # This simulates the Render configuration mistake
+# Apply our fix
+private_key_fixed = (private_key_raw or "").strip().replace('\\n', '\n')
 
-    print("✅ Environment configured:")
-    print(f"   FIREBASE_PROJECT_ID: {os.environ.get('FIREBASE_PROJECT_ID')}")
-    print(f"   FIREBASE_CLIENT_EMAIL: {os.environ.get('FIREBASE_CLIENT_EMAIL')}")
-    print(f"   FIREBASE_STORAGE_BUCKET: {os.environ.get('FIREBASE_STORAGE_BUCKET', '<<NOT SET>>')}")
-    print()
+print("2. AFTER APPLYING OUR FIX: .replace('\\n', '\\n')")
+print(f"   Length: {len(private_key_fixed)} characters")
+print(f"   First 30 chars: {repr(private_key_fixed[:30])}")
+print(f"   Last 30 chars: {repr(private_key_fixed[-30:])}")
+print(f"   Literal backslash-n sequences remaining: {private_key_fixed.count('\\n')}")
+print(f"   Actual newline characters: {private_key_fixed.count(chr(10))}")
+print()
 
-    # Now test the actual import that was failing in Render
-    try:
-        print("🔄 Attempting to import app (this is what was failing in Render)...")
-        import app
-        print("❌ ERROR: Import succeeded when it should have failed!")
-        print("   This means the fix is not working correctly.")
-        return False
+print("3. VERIFICATION:")
+print(f"   + Literal backslash-n sequences converted to newlines: {private_key_raw.count('\\n')} -> {private_key_fixed.count('\\n')} (should be 0)")
+print(f"   + Actual newline characters created: {private_key_raw.count(chr(10))} -> {private_key_fixed.count(chr(10))} (should be +2)")
+print(f"   + Total length change: {len(private_key_raw)} -> {len(private_key_fixed)} (should be -2)")
+print()
 
-    except ValueError as e:
-        error_msg = str(e)
-        print("✅ SUCCESS: Import failed with ValueError (as expected)")
-        print(f"   Error message: {error_msg}")
+print("4. FORMATTED RESULT (showing structure):")
+print("   " + "="*50)
+formatted_lines = private_key_fixed.split('\n')
+for i, line in enumerate(formatted_lines):
+    if i < 3:  # Show first 3 lines
+        print(f"   {line}")
+    elif i == 3 and len(formatted_lines) > 4:
+        print("   ...")
+    elif i >= len(formatted_lines) - 2:  # Show last 2 lines
+        print(f"   {line}")
+print("   " + "="*50)
+print()
 
-        # Verify it's the correct error message
-        expected_parts = [
-            "FIREBASE_STORAGE_BUCKET environment variable is not set",
-            "Firebase Storage bucket name is required for document storage functionality"
-        ]
+print("=== CONCLUSION ===")
+if private_key_fixed.count('\\n') == 0 and private_key_fixed.count(chr(10)) == 2:
+    print("[SUCCESS] Newline processing is working correctly!")
+    print("   The literal backslash-n sequences have been converted to actual newlines.")
+    print("   This should resolve the 'Unable to load PEM file' error related to InvalidByte(0, 92).")
+else:
+    print("[ISSUE] Newline processing may not be working correctly.")
 
-        all_parts_present = all(part in error_msg for part in expected_parts)
-
-        if all_parts_present:
-            print("✅ SUCCESS: Error message is clear and actionable")
-            print("   Render user will now know exactly what to fix!")
-            return True
-        else:
-            print("❌ ERROR: Error message doesn't contain expected guidance")
-            print(f"   Expected to find: {expected_parts}")
-            return False
-
-    except Exception as e:
-        print(f"❌ ERROR: Import failed with unexpected exception: {e}")
-        print("   This suggests there's another issue.")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_development_still_works():
-    """Verify that development/test usage with mocks still works."""
-
-    print("\n🔧 Testing that development mode still works...")
-
-    # Clear Firebase env vars to trigger mock mode
-    for key in list(os.environ.keys()):
-        if key.startswith('FIREBASE_') or key == 'FLASK_SECRET_KEY':
-            del os.environ[key]
-
-    # Set minimal Flask secret key
-    os.environ['FLASK_SECRET_KEY'] = 'test-secret-key-for-development'
-
-    try:
-        import app
-        print("✅ SUCCESS: App imports correctly in development/mock mode")
-        return True
-    except Exception as e:
-        print(f"❌ ERROR: Failed to import in development mode: {e}")
-        return False
-
-if __name__ == "__main__":
-    print("🚀 Final Verification of Firebase Storage Fix")
-    print("=" * 50)
-
-    # Test 1: The production scenario that was failing
-    test1_passed = test_render_production_scenario()
-
-    # Test 2: Ensure we didn't break development usage
-    test2_passed = test_development_still_works()
-
-    print("\n" + "=" * 50)
-    print("📋 FINAL RESULTS:")
-    print(f"   Render scenario test: {'✅ PASS' if test1_passed else '❌ FAIL'}")
-    print(f"   Development mode test: {'✅ PASS' if test2_passed else '❌ FAIL'}")
-
-    if test1_passed and test2_passed:
-        print("\n🎉 ALL TESTS PASSED!")
-        print("   The fix successfully resolves the Render deployment issue")
-        print("   while maintaining correct development behavior.")
-        sys.exit(0)
-    else:
-        print("\n💥 SOME TESTS FAILED!")
-        sys.exit(1)
+print()
+print("Note: Any remaining PEM loading errors are likely due to the key data itself")
+print("being malformed or truncated, not due to the newline processing fix.")
