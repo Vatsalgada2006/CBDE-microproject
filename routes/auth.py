@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify, current_app
 from services.firebase_service import auth, verify_firebase_token
 from services.user_service import UserService
 from services.audit_service import audit_service
+from utils.validation import validate_email, validate_password, ValidationError, sanitize_input
 from models.user import User
 from functools import wraps
 
@@ -103,13 +104,24 @@ def register():
     password = data['password']
     display_name = data.get('display_name', email.split('@')[0])
 
+    # Sanitize inputs
+    email = sanitize_input(email, max_length=255)
+    password = sanitize_input(password, max_length=128)
+    display_name = sanitize_input(display_name, max_length=100)
+
     # Validate email format
-    if not is_valid_email(email):
+    if not validate_email(email):
         return jsonify({'error': 'Invalid email format'}), 400
 
     # Validate password strength
-    if not is_valid_password(password):
-        return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+    if not validate_password(password):
+        return jsonify({'error': 'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character'}), 400
+
+    # Validate display name
+    if not display_name:
+        return jsonify({'error': 'Display name is required'}), 400
+    if len(display_name) < 2:
+        return jsonify({'error': 'Display name must be at least 2 characters long'}), 400
 
     try:
         # Create user in Firebase Authentication
@@ -156,8 +168,6 @@ def register():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 400
-
-@auth_bp.route('/verify-token', methods=['POST'])
 def verify_token():
     """
     Verify Firebase ID token and return user data.

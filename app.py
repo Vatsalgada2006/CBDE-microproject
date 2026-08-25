@@ -1,7 +1,9 @@
+from flask import jsonify
 import logging
 from logging.handlers import RotatingFileHandler
 import os
-from flask import Flask, render_template
+import time
+from flask import Flask, render_template, request, g
 from config import Config
 from routes.auth import auth_bp
 from routes.documents import documents_bp
@@ -10,6 +12,9 @@ from routes.sharing import sharing_bp
 from routes.intelligence import intelligence_bp
 from services.firebase_service import initialize_demo_data
 from datetime import datetime, timezone
+
+# In-memory store for rate limiting (in production, use Redis or similar)
+_request_counts = {}
 
 def create_app():
     app = Flask(__name__)
@@ -32,6 +37,67 @@ def create_app():
     @app.context_processor
     def inject_now():
         return {'now': lambda: datetime.now(timezone.utc)}
+
+    # Security headers
+    @app.after_request
+    def add_security_headers(response):
+        # Prevent clickjacking
+        response.headers['X-Frame-Options'] = 'DENY'
+        
+        # Prevent MIME type sniffing
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        
+        # Enable XSS protection
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Referrer policy
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        
+        # Content Security Policy
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://www.google.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https://*.googleapis.com https://*.google.com https://www.gstatic.com; "
+            "frame-src 'self' https://accounts.google.com;"
+        )
+        response.headers['Content-Security-Policy'] = csp
+        
+        # Remove server header (optional)
+        # response.headers['Server'] = 'IntelliDoc'
+        
+        return response
+
+    # Rate limiting
+    def is_rate_limited(key, limit=10, window=60):
+        """Basic rate limiting: limit requests per window (in seconds)"""
+        now = time.time()
+        window_start = now - window
+        
+        # Clean old entries
+        if key in _request_counts:
+            _request_counts[key] = [t for t in _request_counts[key] if t > window_start]
+        else:
+            _request_counts[key] = []
+        
+        # Check if limit exceeded
+        if len(_request_counts[key]) >= limit:
+            return True
+        
+        # Add current request
+        _request_counts[key].append(now)
+        return False
+
+    @app.before_request
+    def check_rate_limit():
+        # Apply rate limiting to auth endpoints
+        if request.path.startswith('/auth/'):
+            # Use IP address as key (in production, consider user ID or API key)
+            key = f"rate_limit:{request.remote_addr}:{request.path}"
+            if is_rate_limited(key, limit=20, window=60):  # 20 requests per minute
+                return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/auth')

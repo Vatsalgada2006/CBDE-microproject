@@ -57,10 +57,10 @@ class Document:
             UpdatedAt=data.get('UpdatedAt'),
             folder_id=data.get('folder_id'),
             tags=data.get('tags'),
-            extraction_status=data.get('extraction_status'),
-            intelligence_status=data.get('intelligence_status'),
+            extraction_status=data.get('extraction_status', 'pending'),
+            intelligence_status=data.get('intelligence_status', 'pending'),
             hash=data.get('hash'),
-            version=data.get('version'),
+            version=data.get('version', 1),
             embedding=data.get('embedding'),
             is_favorite=data.get('is_favorite', False)
         )
