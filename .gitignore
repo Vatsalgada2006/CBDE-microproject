@@ -78,6 +78,11 @@ Thumbs.db
 # Firebase service account (if you accidentally commit it)
 */serviceAccountKey.json
 
+# Environment backups and keys
+.env.backup
+*.pem
+*.key
+
 # Logs
 *.log
 
