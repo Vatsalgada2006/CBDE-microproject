@@ -86,7 +86,6 @@ if not _firebase_initialized:
 else:
     logger.info(f"Firebase initialized (_firebase_initialized={_firebase_initialized})")
 
-
 # Initialize Firestore and Storage clients or mocks
 if _firebase_initialized:
     firestore_db = firestore.client(firebase_app)
@@ -201,4 +200,3 @@ def verify_firebase_token(id_token):
         return decoded_token
     except Exception as e:
         logger.error(f"Error verifying Firebase token: {e}")
-        return None
