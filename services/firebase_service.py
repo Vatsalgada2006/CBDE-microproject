@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import auth, credentials, firestore, storage
 import uuid
 from datetime import datetime, timezone
+import base64
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -16,15 +17,44 @@ from mocks.firebase_mock import MockAuth, MockFirestore, MockStorageBucket
 _firebase_initialized = False
 firebase_app = None
 
+
+# Initialize Firebase when this module is loaded
 def initialize_firebase():
     global _firebase_initialized, firebase_app
     try:
         if not firebase_admin._apps:
+            # Get the private key from environment and replace escaped newlines
+            private_key_raw = (Config.FIREBASE_PRIVATE_KEY or "").strip()
+            # Replace literal \n characters (backslash followed by n) with actual newlines
+            # Using explicit chr() to avoid Python string escaping issues
+            backslash = chr(92)   # Backslash character
+            n_char = chr(110)     # 'n' character
+            newline = chr(10)     # Newline character
+            old_sequence = backslash + n_char  # This is the two-char sequence: backslash-n
+            new_sequence = newline             # This is the one-char sequence: newline
+            private_key_str = private_key_raw.replace(old_sequence, new_sequence)
+            # Extract the content between header and footer
+            header = '-----BEGIN PRIVATE KEY-----'
+            footer = '-----END PRIVATE KEY-----'
+            if private_key_str.startswith(header) and private_key_str.endswith(footer):
+                content = private_key_str[len(header):-len(footer)]
+                # Remove all whitespace to get raw base64 data
+                base64_data = ''.join(content.split())
+                # Pad the raw base64 data if needed to make length a multiple of 4
+                padding_needed = (4 - len(base64_data) % 4) % 4
+                if padding_needed > 0:
+                    base64_data = base64_data + '=' * padding_needed
+                # Reconstruct the PEM with properly padded base64 data
+                # For simplicity, we'll put it all on one line between header and footer
+                # (this should work fine with firebase_admin)
+                private_key_str = header + '\n' + base64_data + '\n' + footer
+            else:
+                # If it doesn't match expected format, use as-is (though this should not happen)
+                pass
             cred = credentials.Certificate({
                 "type": "service_account",
                 "project_id": Config.FIREBASE_PROJECT_ID,
-                "private_key_id": Config.FIREBASE_PRIVATE_KEY_ID or "",
-                "private_key": (Config.FIREBASE_PRIVATE_KEY or "").strip().replace('\\n', '\n'),
+                "private_key": private_key_str,
                 "client_email": Config.FIREBASE_CLIENT_EMAIL,
                 "client_id": Config.FIREBASE_CLIENT_ID or "",
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -45,9 +75,9 @@ def initialize_firebase():
         _firebase_initialized = False
         firebase_app = None
 
-# Initialize Firebase when this module is loaded
-initialize_firebase()
 
+# Initialize Firebase when module loads
+initialize_firebase()
 
 # If Firebase is not initialized, replace the auth module with our mock
 if not _firebase_initialized:
@@ -55,6 +85,7 @@ if not _firebase_initialized:
     auth = MockAuth()
 else:
     logger.info(f"Firebase initialized (_firebase_initialized={_firebase_initialized})")
+
 
 # Initialize Firestore and Storage clients or mocks
 if _firebase_initialized:
@@ -71,6 +102,7 @@ if _firebase_initialized:
 else:
     firestore_db = MockFirestore()
     storage_bucket = MockStorageBucket()
+
 
 def initialize_demo_data():
     """Initialize demo data for presentation purposes when using mock Firebase."""
@@ -152,6 +184,8 @@ def initialize_demo_data():
     except Exception as e:
         logger.error(f"Error initializing demo data: {e}")
         # Don't fail the app initialization if demo data fails
+
+
 def verify_firebase_token(id_token):
     if not _firebase_initialized:
         # Return a mock decoded token for development
