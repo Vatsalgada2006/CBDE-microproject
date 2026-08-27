@@ -10,6 +10,7 @@ from routes.documents import documents_bp
 from routes.folders import folders_bp
 from routes.sharing import sharing_bp
 from routes.intelligence import intelligence_bp
+from routes.health_center import health_center_bp
 from services.firebase_service import initialize_demo_data
 from datetime import datetime, timezone
 
@@ -111,6 +112,7 @@ def create_app():
     app.register_blueprint(folders_bp, url_prefix='/folders')
     app.register_blueprint(sharing_bp, url_prefix='/sharing')
     app.register_blueprint(intelligence_bp, url_prefix='/intelligence')
+    app.register_blueprint(health_center_bp, url_prefix='/api/health-center')
 
     @app.route('/')
     def index():
@@ -119,6 +121,22 @@ def create_app():
     @app.route('/inbox')
     def inbox():
         return render_template('inbox.html', title='AI Inbox - IntelliDoc')
+
+    @app.route('/ask')
+    def ask():
+        return render_template('ask.html', title='Ask Your Documents - IntelliDoc')
+
+    @app.route('/search')
+    def search():
+        return render_template('search.html', title='Search - IntelliDoc')
+
+    @app.route('/health-center')
+    def health_center():
+        return render_template('health_center.html', title='Health & Security Center - IntelliDoc')
+
+    @app.route('/activity')
+    def activity():
+        return render_template('activity.html', title='Activity Trail - IntelliDoc')
 
     @app.route('/health', methods=['GET'])
     def health_check():

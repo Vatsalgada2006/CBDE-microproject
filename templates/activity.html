@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block title %}Activity Trail - IntelliDoc{% endblock %}
+
+{% block content %}
+<div x-data="activityComponent()" class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Activity Trail</h1>
+        <p class="mt-1 text-sm text-gray-600">Chronological history of events in your workspace.</p>
+    </div>
+
+    <!-- Error State -->
+    <div x-show="error" style="display: none;" class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-md">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-circle text-red-400"></i>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-red-700" x-text="error"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Skeleton -->
+    <div x-show="loading" class="flow-root">
+        <ul class="-mb-8">
+            <template x-for="i in 5" :key="i">
+                <li>
+                    <div class="relative pb-8">
+                        <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" x-show="i !== 5"></span>
+                        <div class="relative flex space-x-3">
+                            <div>
+                                <span class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center ring-8 ring-white animate-pulse"></span>
+                            </div>
+                            <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                                <div>
+                                    <div class="h-4 bg-gray-200 rounded w-32 animate-pulse mb-2"></div>
+                                    <div class="h-3 bg-gray-200 rounded w-48 animate-pulse"></div>
+                                </div>
+                                <div class="whitespace-nowrap text-right text-sm">
+                                    <div class="h-3 bg-gray-200 rounded w-24 animate-pulse"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </template>
+        </ul>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="!loading && activities.length === 0 && !error" style="display: none;" class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-4">
+            <i class="fas fa-history text-2xl text-gray-400"></i>
+        </div>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No activity yet</h3>
+        <p class="mt-1 text-sm text-gray-500">Events in your workspace will appear here.</p>
+    </div>
+
+    <!-- Timeline -->
+    <div x-show="!loading && activities.length > 0" style="display: none;" class="flow-root">
+        <ul class="-mb-8">
+            <template x-for="(activity, activityIdx) in activities" :key="activity.id || activityIdx">
+                <li>
+                    <div class="relative pb-8">
+                        <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" x-show="activityIdx !== activities.length - 1"></span>
+                        <div class="relative flex space-x-3">
+                            <div>
+                                <span :class="['h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-[#f3f4f6] lg:ring-white', getIconBgClass(activity.action)]">
+                                    <i :class="['text-white text-sm fas', getIconClass(activity.action)]"></i>
+                                </span>
+                            </div>
+                            <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900" x-text="formatActionTitle(activity.action)"></p>
+                                    <p class="mt-0.5 text-sm text-gray-500" x-text="activity.details"></p>
+                                </div>
+                                <div class="whitespace-nowrap text-right text-sm text-gray-500">
+                                    <time :datetime="activity.created_at" x-text="activity.created_at_human"></time>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </template>
+        </ul>
+    </div>
+</div>
+
+<script>
+    function activityComponent() {
+        return {
+            activities: [],
+            loading: true,
+            error: null,
+            
+            async init() {
+                try {
+                    const response = await window.authenticatedFetch('/api/health-center/activity');
+                    if (!response.ok) {
+                        throw new Error('Failed to load activity trail');
+                    }
+                    const data = await response.json();
+                    this.activities = data.activities || data || [];
+                } catch (err) {
+                    this.error = err.message || 'An error occurred while loading activity trail.';
+                    if (window.showToast) window.showToast(this.error, 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            formatActionTitle(action) {
+                if (!action) return 'Unknown Action';
+                // e.g., 'document_upload' -> 'Document Upload'
+                return action
+                    .split('_')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+            },
+            
+            getIconClass(action) {
+                const iconMap = {
+                    'document_upload': 'fa-upload',
+                    'document_download': 'fa-download',
+                    'document_delete': 'fa-trash',
+                    'document_share': 'fa-user-plus',
+                    'suggestions_accepted': 'fa-magic',
+                    'document_view': 'fa-eye',
+                    'document_edit': 'fa-edit',
+                    'login': 'fa-sign-in-alt',
+                    'logout': 'fa-sign-out-alt',
+                    'settings_update': 'fa-cog'
+                };
+                
+                return iconMap[action] || 'fa-info';
+            },
+            
+            getIconBgClass(action) {
+                const bgMap = {
+                    'document_upload': 'bg-blue-500',
+                    'document_download': 'bg-emerald-500',
+                    'document_delete': 'bg-red-500',
+                    'document_share': 'bg-indigo-500',
+                    'suggestions_accepted': 'bg-purple-500',
+                    'document_view': 'bg-teal-500',
+                    'document_edit': 'bg-yellow-500',
+                    'login': 'bg-slate-700',
+                    'logout': 'bg-slate-500',
+                    'settings_update': 'bg-orange-500'
+                };
+                
+                return bgMap[action] || 'bg-indigo-400';
+            }
+        };
+    }
+</script>
+{% endblock %}

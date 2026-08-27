@@ -398,3 +398,141 @@ def get_library_health():
         logger.error(f"Error calculating health: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+# ==========================================
+# Phase 6: Cross-Document Search
+# ==========================================
+
+@intelligence_bp.route('/search', methods=['GET'])
+@token_required
+def search_documents():
+    """Cross-document semantic or keyword search scoped to user's authorized files."""
+    try:
+        user_id = request.user['uid']
+        query = request.args.get('q', '').strip()
+        search_type = request.args.get('type', 'semantic')  # 'semantic' or 'keyword'
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        doc_type_filter = request.args.get('doc_type', '')
+        sensitivity_filter = request.args.get('sensitivity', '')
+
+        if not query:
+            return jsonify({'results': [], 'total': 0, 'page': page}), 200
+
+        document_service = get_document_service()
+        # Only search user's own documents (permission-scoped)
+        all_docs = document_service.list_documents_by_owner(user_id)
+
+        if not all_docs:
+            return jsonify({'results': [], 'total': 0, 'page': page}), 200
+
+        # Apply filters
+        if doc_type_filter:
+            all_docs = [d for d in all_docs if getattr(d, 'document_type', '') == doc_type_filter]
+        if sensitivity_filter:
+            all_docs = [d for d in all_docs if getattr(d, 'sensitivity_level', '') == sensitivity_filter]
+
+        results = []
+
+        if search_type == 'semantic':
+            # Semantic search using embeddings
+            intelligence_service = get_intelligence_service()
+            query_embedding = intelligence_service.embedding_service.generate_embedding(query)
+
+            if query_embedding is not None:
+                import numpy as np
+                for doc in all_docs:
+                    # Check if document has stored embedding
+                    doc_embedding = getattr(doc, 'embedding', None)
+                    if doc_embedding is not None:
+                        similarity = float(np.dot(query_embedding, doc_embedding) / (
+                            np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
+                        ))
+                    else:
+                        # Fall back to text matching for docs without embeddings
+                        similarity = _text_relevance(doc, query)
+
+                    if similarity > 0.1:
+                        doc_dict = doc.to_dict()
+                        doc_dict['relevance'] = round(similarity * 100, 1)
+                        doc_dict['match_snippet'] = _get_snippet(doc, query)
+                        results.append(doc_dict)
+            else:
+                # Embeddings unavailable, fall back to keyword search
+                search_type = 'keyword'
+
+        if search_type == 'keyword':
+            query_lower = query.lower()
+            query_words = set(query_lower.split())
+            for doc in all_docs:
+                relevance = _text_relevance(doc, query)
+                if relevance > 0:
+                    doc_dict = doc.to_dict()
+                    doc_dict['relevance'] = round(relevance * 100, 1)
+                    doc_dict['match_snippet'] = _get_snippet(doc, query)
+                    results.append(doc_dict)
+
+        # Sort by relevance descending
+        results.sort(key=lambda x: x.get('relevance', 0), reverse=True)
+
+        # Paginate
+        total = len(results)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated = results[start:end]
+
+        return jsonify({
+            'results': paginated,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'search_type': search_type
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in search: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+def _text_relevance(doc, query: str) -> float:
+    """Compute simple keyword relevance score between a document and a query."""
+    query_words = set(query.lower().split())
+    searchable = ' '.join(filter(None, [
+        getattr(doc, 'filename', '') or '',
+        getattr(doc, 'title', '') or '',
+        ' '.join(getattr(doc, 'tags', []) or []),
+        getattr(doc, 'document_type', '') or '',
+        ' '.join(getattr(doc, 'entities', []) or []),
+    ])).lower()
+
+    if not searchable:
+        return 0.0
+
+    matches = sum(1 for w in query_words if w in searchable)
+    return matches / len(query_words) if query_words else 0.0
+
+
+def _get_snippet(doc, query: str, max_len: int = 200) -> str:
+    """Generate a text snippet from document metadata showing the match context."""
+    searchable = ' '.join(filter(None, [
+        getattr(doc, 'title', '') or '',
+        getattr(doc, 'filename', '') or '',
+        ' '.join(getattr(doc, 'tags', []) or []),
+    ]))
+    if not searchable:
+        return ''
+
+    query_lower = query.lower()
+    text_lower = searchable.lower()
+    idx = text_lower.find(query_lower.split()[0] if query_lower.split() else '')
+    if idx == -1:
+        return searchable[:max_len]
+
+    start = max(0, idx - 50)
+    end = min(len(searchable), idx + max_len - 50)
+    snippet = searchable[start:end]
+    if start > 0:
+        snippet = '...' + snippet
+    if end < len(searchable):
+        snippet = snippet + '...'
+    return snippet

@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Search - IntelliDoc{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8" x-data="searchComponent()">
+    
+    <!-- Search Bar Section -->
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-200">
+        <form @submit.prevent="search(1)">
+            <div class="relative flex items-center w-full mb-4">
+                <i class="fa-solid fa-search absolute left-4 text-gray-400 text-lg"></i>
+                <input type="text" x-model="query" placeholder="Search your documents..." class="w-full pl-12 pr-4 py-4 rounded-lg bg-gray-50 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-lg transition-colors duration-200 text-gray-900 placeholder-gray-400">
+                <button type="submit" class="absolute right-3 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-md font-medium transition-colors" :disabled="loading">
+                    Search
+                </button>
+            </div>
+
+            <!-- Options & Filters -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                
+                <!-- Search Type Toggle -->
+                <div class="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
+                    <button type="button" @click="searchType = 'keyword'" :class="{'bg-white shadow-sm text-indigo-700': searchType === 'keyword', 'text-gray-500 hover:text-gray-700': searchType !== 'keyword'}" class="flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded-md transition-colors">
+                        Keyword
+                    </button>
+                    <button type="button" @click="searchType = 'semantic'" :class="{'bg-white shadow-sm text-indigo-700': searchType === 'semantic', 'text-gray-500 hover:text-gray-700': searchType !== 'semantic'}" class="flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded-md transition-colors">
+                        Semantic
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <select x-model="filters.type" class="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5">
+                        <option value="">Any Type</option>
+                        <option value="pdf">PDF</option>
+                        <option value="doc">Document</option>
+                        <option value="image">Image</option>
+                        <option value="spreadsheet">Spreadsheet</option>
+                    </select>
+
+                    <select x-model="filters.dateRange" class="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5">
+                        <option value="">Any Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">Past Week</option>
+                        <option value="month">Past Month</option>
+                        <option value="year">Past Year</option>
+                    </select>
+
+                    <select x-model="filters.sensitivity" class="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 px-3 py-1.5">
+                        <option value="">Any Sensitivity</option>
+                        <option value="public">Public</option>
+                        <option value="internal">Internal</option>
+                        <option value="confidential">Confidential</option>
+                        <option value="restricted">Restricted</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Area -->
+    <div class="space-y-4">
+        
+        <!-- Loading State -->
+        <div x-show="loading" class="text-center py-12" style="display: none;">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-500 mb-4"></i>
+            <p class="text-gray-500">Searching across your documents...</p>
+        </div>
+
+        <!-- Initial Empty State -->
+        <div x-show="!loading && !hasSearched" class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+            <div class="w-20 h-20 mx-auto bg-indigo-50 rounded-full flex items-center justify-center mb-4">
+                <i class="fa-solid fa-magnifying-glass text-3xl text-indigo-500"></i>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Search across all your documents</h3>
+            <p class="text-gray-500 max-w-md mx-auto">Try semantic search to find documents by meaning, not just keywords.</p>
+        </div>
+
+        <!-- No Results State -->
+        <div x-show="!loading && hasSearched && results.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center" style="display: none;">
+            <i class="fa-regular fa-folder-open text-5xl text-gray-300 mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">No documents matched your search</h3>
+            <p class="text-gray-500">Try adjusting your terms or filters to find what you're looking for.</p>
+        </div>
+
+        <!-- Results List -->
+        <template x-for="result in results" :key="result.id">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                <div class="flex items-start gap-4">
+                    
+                    <!-- Icon -->
+                    <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100">
+                        <i :class="getFileIcon(result.content_type) + ' text-2xl text-gray-600'"></i>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="flex-grow min-w-0">
+                        <div class="flex items-start justify-between gap-4 mb-1">
+                            <h4 class="text-lg font-medium text-gray-900 truncate">
+                                <a :href="'/documents/view/' + result.id" class="hover:text-indigo-600 transition-colors" x-text="result.title || result.filename"></a>
+                            </h4>
+                            <a :href="'/documents/view/' + result.id" class="flex-shrink-0 text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors">
+                                View Document
+                            </a>
+                        </div>
+                        
+                        <!-- Relevance Score -->
+                        <div class="flex items-center gap-2 mb-3" title="Relevance Score">
+                            <div class="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div class="h-full bg-indigo-500" :style="'width: ' + (result.score * 100) + '%'"></div>
+                            </div>
+                            <span class="text-xs text-gray-500 font-medium" x-text="Math.round(result.score * 100) + '% Match'"></span>
+                        </div>
+
+                        <!-- Snippet -->
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-3 leading-relaxed" x-html="highlightMatch(result.snippet, query)"></p>
+
+                        <!-- Metadata row -->
+                        <div class="flex flex-wrap items-center gap-2 text-xs">
+                            <span :class="getSensitivityClass(result.sensitivity)" class="px-2 py-1 rounded-full font-medium" x-text="result.sensitivity || 'Public'"></span>
+                            
+                            <template x-for="tag in (result.tags || [])">
+                                <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-md border border-gray-200" x-text="tag"></span>
+                            </template>
+                            
+                            <span class="text-gray-400 ml-auto flex items-center gap-1">
+                                <i class="fa-regular fa-clock"></i>
+                                <span x-text="timeAgo(result.upload_date)"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+        
+        <!-- Pagination -->
+        <div x-show="!loading && hasSearched && totalResults > 0" class="flex items-center justify-between border-t border-gray-200 pt-6 mt-6" style="display: none;">
+            <p class="text-sm text-gray-600">
+                Showing page <span class="font-medium text-gray-900" x-text="page"></span>
+            </p>
+            <div class="flex gap-2">
+                <button @click="search(page - 1)" :disabled="page <= 1" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Previous
+                </button>
+                <button @click="search(page + 1)" :disabled="results.length < 10" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Next
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    mark {
+        background-color: rgba(253, 224, 71, 0.4);
+        color: inherit;
+        padding: 0 0.1em;
+        border-radius: 0.2em;
+    }
+</style>
+
+<script>
+function searchComponent() {
+    return {
+        query: '',
+        searchType: 'semantic',
+        results: [],
+        loading: false,
+        hasSearched: false,
+        filters: {
+            type: '',
+            dateRange: '',
+            sensitivity: ''
+        },
+        page: 1,
+        totalResults: 0,
+        
+        async search(targetPage = 1) {
+            if (!this.query.trim() && this.searchType === 'keyword') return;
+            
+            this.loading = true;
+            this.hasSearched = true;
+            this.page = targetPage;
+            
+            const params = new URLSearchParams({
+                q: this.query,
+                type: this.searchType,
+                page: this.page,
+                doc_type: this.filters.type,
+                date: this.filters.dateRange,
+                sensitivity: this.filters.sensitivity
+            });
+            
+            try {
+                const response = await window.authenticatedFetch(`/api/intelligence/search?${params.toString()}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.results = data.results || [];
+                    this.totalResults = data.total || this.results.length;
+                } else {
+                    window.showToast('Search failed.', 'error');
+                    this.results = [];
+                }
+            } catch (err) {
+                console.error(err);
+                window.showToast('Network error during search.', 'error');
+                this.results = [];
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        highlightMatch(text, query) {
+            if (!text) return '';
+            if (!query || this.searchType === 'semantic') return text;
+            
+            const words = query.trim().split(/\s+/).filter(w => w.length > 2);
+            if (words.length === 0) return text;
+            
+            let highlighted = text;
+            highlighted = highlighted.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            words.forEach(word => {
+                const regex = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                highlighted = highlighted.replace(regex, '<mark>$1</mark>');
+            });
+            
+            return highlighted;
+        },
+        
+        getFileIcon(contentType) {
+            if (!contentType) return 'fa-solid fa-file';
+            const type = contentType.toLowerCase();
+            if (type.includes('pdf')) return 'fa-solid fa-file-pdf';
+            if (type.includes('word') || type.includes('doc')) return 'fa-solid fa-file-word';
+            if (type.includes('image')) return 'fa-solid fa-file-image';
+            if (type.includes('excel') || type.includes('spreadsheet') || type.includes('csv')) return 'fa-solid fa-file-excel';
+            if (type.includes('text') || type.includes('txt')) return 'fa-solid fa-file-lines';
+            return 'fa-solid fa-file';
+        },
+        
+        getSensitivityClass(level) {
+            if (!level) return 'bg-gray-100 text-gray-700 border-gray-200 border';
+            const l = level.toLowerCase();
+            if (l === 'public') return 'bg-green-100 text-green-700 border-green-200 border';
+            if (l === 'internal') return 'bg-blue-100 text-blue-700 border-blue-200 border';
+            if (l === 'confidential') return 'bg-orange-100 text-orange-700 border-orange-200 border';
+            if (l === 'restricted') return 'bg-red-100 text-red-700 border-red-200 border';
+            return 'bg-gray-100 text-gray-700 border-gray-200 border';
+        },
+        
+        timeAgo(dateStr) {
+            if (!dateStr) return 'Unknown';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffSec = Math.floor(diffMs / 1000);
+            
+            if (diffSec < 60) return 'just now';
+            const diffMin = Math.floor(diffSec / 60);
+            if (diffMin < 60) return `${diffMin} min ago`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr} hours ago`;
+            const diffDays = Math.floor(diffHr / 24);
+            if (diffDays === 1) return 'yesterday';
+            if (diffDays < 30) return `${diffDays} days ago`;
+            const diffMonths = Math.floor(diffDays / 30);
+            if (diffMonths < 12) return `${diffMonths} months ago`;
+            return `${Math.floor(diffMonths / 12)} years ago`;
+        }
+    }
+}
+</script>
+{% endblock %}

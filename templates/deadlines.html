@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+
+{% block title %}Upcoming Deadlines - IntelliDoc{% endblock %}
+
+{% block content %}
+<div x-data="deadlinesComponent()" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Upcoming Deadlines</h1>
+        <p class="mt-2 text-sm text-gray-600">Important dates extracted from your documents by AI.</p>
+    </div>
+
+    <!-- Loading Skeleton -->
+    <template x-if="loading">
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <template x-for="i in 6" :key="i">
+                <div class="bg-gray-50 rounded-xl p-6 shadow-sm animate-pulse flex flex-col h-full border border-gray-100">
+                    <div class="flex justify-between items-start mb-4 w-full">
+                        <div class="h-6 bg-gray-200 rounded w-3/4"></div>
+                        <div class="h-6 w-6 bg-gray-200 rounded-full ml-4"></div>
+                    </div>
+                    <div class="h-8 bg-gray-200 rounded-full w-1/3 mb-4"></div>
+                    <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded w-5/6 mb-auto"></div>
+                    <div class="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center w-full">
+                        <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+                        <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- Error State -->
+    <template x-if="error && !loading">
+        <div class="rounded-md bg-red-50 p-4 border border-red-100 shadow-sm">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-circle text-red-400 mt-0.5"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800" x-text="error"></h3>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Empty State -->
+    <template x-if="!loading && !error && documents.length === 0">
+        <div class="text-center py-16 bg-gray-50 rounded-xl shadow-sm border border-gray-100">
+            <div class="mx-auto h-16 w-16 bg-white rounded-full shadow-sm flex items-center justify-center text-gray-400 mb-6">
+                <i class="far fa-calendar-times text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900">No upcoming deadlines found</h3>
+            <p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
+                Upload contracts or invoices and our AI will automatically extract important dates.
+            </p>
+            <div class="mt-8">
+                <a href="/documents/upload" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors duration-200">
+                    <i class="fas fa-upload mr-2"></i> Upload Document
+                </a>
+            </div>
+        </div>
+    </template>
+
+    <!-- Deadlines Grid -->
+    <template x-if="!loading && !error && documents.length > 0">
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <template x-for="doc in documents" :key="doc.id">
+                <div class="bg-gray-50 rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col h-full hover:shadow-md transition-shadow duration-200">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 line-clamp-2" x-text="doc.title || doc.filename"></h3>
+                        <div class="ml-4 flex-shrink-0 bg-white p-2 rounded-lg shadow-sm border border-gray-100">
+                            <i class="fas fa-file-alt text-indigo-500 text-lg"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold shadow-sm border"
+                              :class="getBadgeStyles(doc.deadline || doc.extracted_deadline)">
+                            <i class="far fa-calendar-alt mr-1.5 text-xs opacity-75"></i>
+                            <span x-text="getFormattedDate(doc.deadline || doc.extracted_deadline)"></span>
+                        </span>
+                    </div>
+
+                    <div class="mb-auto text-sm text-gray-600">
+                        <template x-if="doc.context">
+                            <p class="line-clamp-3 mb-3 bg-white p-3 rounded-lg border border-gray-100 text-gray-700 italic" x-text="`&quot;${doc.context}&quot;`"></p>
+                        </template>
+                        <template x-if="doc.tags && doc.tags.length > 0">
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="tag in doc.tags" :key="tag">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700" x-text="tag"></span>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-gray-200 flex justify-between items-center">
+                        <span class="text-xs font-medium" :class="getTextColor(doc.deadline || doc.extracted_deadline)">
+                            <i class="far fa-clock mr-1"></i>
+                            <span x-text="getRelativeTime(doc.deadline || doc.extracted_deadline)"></span>
+                        </span>
+                        <a :href="`/documents/view/${doc.id}`" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 flex items-center transition-colors duration-200 group">
+                            View Document <i class="fas fa-arrow-right ml-1.5 text-xs group-hover:translate-x-0.5 transition-transform duration-200"></i>
+                        </a>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+</div>
+
+<script>
+    function deadlinesComponent() {
+        return {
+            documents: [],
+            loading: true,
+            error: null,
+            
+            async init() {
+                try {
+                    this.loading = true;
+                    const response = await window.authenticatedFetch('/documents/deadlines/api');
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.documents = data.documents || (Array.isArray(data) ? data : []);
+                        
+                        // Sort by deadline (closest first, past deadlines at top)
+                        this.documents.sort((a, b) => {
+                            const dateA = new Date(a.deadline || a.extracted_deadline);
+                            const dateB = new Date(b.deadline || b.extracted_deadline);
+                            return dateA - dateB;
+                        });
+                    } else {
+                        this.error = 'Failed to load upcoming deadlines.';
+                        window.showToast(this.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error fetching deadlines:', error);
+                    this.error = 'An error occurred while fetching your deadlines.';
+                    window.showToast(this.error, 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            getDaysUntil(dateString) {
+                if (!dateString) return 0;
+                
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                
+                const deadlineDate = new Date(dateString);
+                deadlineDate.setHours(0,0,0,0);
+                
+                const diffTime = deadlineDate.getTime() - today.getTime();
+                return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            },
+            
+            getBadgeStyles(dateString) {
+                if (!dateString) return 'bg-gray-100 text-gray-800 border-gray-200';
+                
+                const days = this.getDaysUntil(dateString);
+                
+                if (days < 0) {
+                    return 'bg-red-50 text-red-700 border-red-200'; // Past due
+                } else if (days <= 7) {
+                    return 'bg-orange-50 text-orange-700 border-orange-200'; // Upcoming soon
+                } else {
+                    return 'bg-green-50 text-green-700 border-green-200'; // Future
+                }
+            },
+            
+            getTextColor(dateString) {
+                if (!dateString) return 'text-gray-500';
+                const days = this.getDaysUntil(dateString);
+                if (days < 0) return 'text-red-600';
+                if (days <= 7) return 'text-orange-600';
+                return 'text-gray-500';
+            },
+            
+            getFormattedDate(dateString) {
+                if (!dateString) return 'No Date';
+                
+                const options = { year: 'numeric', month: 'short', day: 'numeric' };
+                const date = new Date(dateString);
+                
+                if (isNaN(date.getTime())) return dateString;
+                return date.toLocaleDateString(undefined, options);
+            },
+            
+            getRelativeTime(dateString) {
+                if (!dateString) return '';
+                
+                const days = this.getDaysUntil(dateString);
+                
+                if (days < 0) {
+                    const absDays = Math.abs(days);
+                    return `${absDays} day${absDays !== 1 ? 's' : ''} ago`;
+                } else if (days === 0) {
+                    return 'Due today';
+                } else if (days === 1) {
+                    return 'Due tomorrow';
+                } else {
+                    return `Due in ${days} days`;
+                }
+            }
+        }
+    }
+</script>
+{% endblock %}

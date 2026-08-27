@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Ask Your Documents - IntelliDoc{% endblock %}
+
+{% block content %}
+<div class="flex h-full bg-gray-50 rounded-xl shadow-sm border border-gray-200 overflow-hidden" x-data="askComponent()">
+    
+    <!-- Left Sidebar: Document Selector -->
+    <div class="hidden md:flex flex-col w-80 bg-white border-r border-gray-200 h-full">
+        <div class="p-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900 mb-2">Knowledge Base</h2>
+            <div class="relative">
+                <i class="fa-solid fa-search absolute left-3 top-3.5 text-gray-400 text-sm"></i>
+                <input type="text" x-model="docSearch" placeholder="Search documents..." class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-2">
+            <template x-for="doc in filteredDocs" :key="doc.id">
+                <label class="flex items-start p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors border border-transparent has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                    <div class="flex-shrink-0 h-5 w-5 mt-0.5">
+                        <input type="checkbox" :value="doc.id" x-model="selectedDocs" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1">
+                    </div>
+                    <div class="ml-3 min-w-0 flex-1">
+                        <p class="text-sm font-medium text-gray-900 truncate" x-text="doc.filename"></p>
+                        <p class="text-xs text-gray-500 truncate" x-text="doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Unknown date'"></p>
+                    </div>
+                </label>
+            </template>
+            <div x-show="!loadingDocs && filteredDocs.length === 0" class="text-center py-6 text-gray-500 text-sm">
+                No documents found.
+            </div>
+            <div x-show="loadingDocs" class="text-center py-6 text-gray-500 text-sm">
+                <i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Chat Interface -->
+    <div class="flex-1 flex flex-col h-full bg-gray-50 relative">
+        
+        <!-- Messages Area -->
+        <div id="messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6" x-ref="messagesContainer">
+            
+            <!-- Empty State -->
+            <div x-show="messages.length === 0" class="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto">
+                <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-6">
+                    <i class="fa-solid fa-robot text-3xl text-indigo-600"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Ask your documents anything</h2>
+                <p class="text-gray-600 mb-8">Select documents from the sidebar and type your question below. The AI will answer based solely on your files.</p>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                    <button @click="fillQuestion('Summarize the key points in these documents.')" class="p-3 text-sm text-left text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-sm transition-all">
+                        <i class="fa-regular fa-file-lines text-indigo-500 mr-2"></i> Summarize key points
+                    </button>
+                    <button @click="fillQuestion('What are the main action items mentioned?')" class="p-3 text-sm text-left text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-sm transition-all">
+                        <i class="fa-solid fa-list-check text-indigo-500 mr-2"></i> Extract action items
+                    </button>
+                    <button @click="fillQuestion('What are the financial metrics reported?')" class="p-3 text-sm text-left text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-sm transition-all">
+                        <i class="fa-solid fa-chart-line text-indigo-500 mr-2"></i> Financial metrics
+                    </button>
+                    <button @click="fillQuestion('Who are the main parties involved?')" class="p-3 text-sm text-left text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-sm transition-all">
+                        <i class="fa-solid fa-users text-indigo-500 mr-2"></i> Identify parties
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <template x-for="(msg, index) in messages" :key="index">
+                <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                    
+                    <!-- AI Bubble -->
+                    <div x-show="msg.role === 'ai'" class="flex max-w-[90%] md:max-w-[75%] items-start">
+                        <div class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center mr-3 mt-1 shadow-sm">
+                            <i class="fa-solid fa-robot text-white text-sm"></i>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm shadow-sm p-4 text-sm text-gray-800 space-y-3 relative group">
+                            
+                            <!-- Confidence Badge -->
+                            <div x-show="msg.confidence !== undefined" class="absolute -top-3 -right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"
+                                      :class="{
+                                          'bg-green-100 text-green-800 border-green-200': msg.confidence > 0.7,
+                                          'bg-yellow-100 text-yellow-800 border-yellow-200': msg.confidence <= 0.7 && msg.confidence > 0.4,
+                                          'bg-red-100 text-red-800 border-red-200': msg.confidence <= 0.4
+                                      }">
+                                    <i class="fa-solid fa-bullseye mr-1"></i> <span x-text="(msg.confidence * 100).toFixed(0) + '%'"></span>
+                                </span>
+                            </div>
+
+                            <!-- Answer text -->
+                            <div class="prose prose-sm max-w-none text-gray-800" x-html="formatMessage(msg.content)"></div>
+                            
+                            <!-- Citations Expandable -->
+                            <div x-show="msg.citations && msg.citations.length > 0" x-data="{ expanded: false }" class="mt-4 pt-3 border-t border-gray-100">
+                                <button @click="expanded = !expanded" class="flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
+                                    <i class="fa-solid fa-book-open mr-1.5"></i> 
+                                    <span x-text="expanded ? 'Hide Sources' : msg.citations.length + ' Sources'"></span>
+                                    <i class="fa-solid fa-chevron-down ml-1.5 transition-transform" :class="expanded ? 'rotate-180' : ''"></i>
+                                </button>
+                                
+                                <div x-show="expanded" x-collapse class="mt-3 space-y-2">
+                                    <template x-for="(citation, idx) in msg.citations" :key="idx">
+                                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs">
+                                            <div class="font-medium text-gray-900 mb-1 flex items-center">
+                                                <i class="fa-regular fa-file-lines text-gray-400 mr-1.5"></i>
+                                                <span x-text="citation.filename || 'Document'"></span>
+                                                <span x-show="citation.score" class="ml-auto text-gray-500" x-text="citation.score ? (citation.score * 100).toFixed(0) + '% match' : ''"></span>
+                                            </div>
+                                            <div class="text-gray-600 italic line-clamp-3" x-text="'&quot;' + citation.snippet + '&quot;'"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Bubble -->
+                    <div x-show="msg.role === 'user'" class="flex max-w-[85%] md:max-w-[75%] items-start justify-end">
+                        <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-sm shadow-sm px-4 py-3 text-sm break-words">
+                            <span x-text="msg.content"></span>
+                        </div>
+                    </div>
+
+                </div>
+            </template>
+            
+            <!-- Typing Indicator -->
+            <div x-show="loading" class="flex justify-start">
+                <div class="flex max-w-[85%] items-start">
+                    <div class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center mr-3 mt-1 shadow-sm">
+                        <i class="fa-solid fa-robot text-white text-sm"></i>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm shadow-sm px-4 py-4 flex items-center space-x-1.5">
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Spacer to ensure scrolling past input -->
+            <div class="h-2"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-white border-t border-gray-200">
+            <div class="max-w-4xl mx-auto relative flex items-end">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" x-show="selectedDocs.length === 0">
+                    <i class="fa-solid fa-circle-exclamation text-amber-500" title="No documents selected"></i>
+                </div>
+                <textarea 
+                    x-model="question" 
+                    @keydown.enter.prevent="if(!loading && selectedDocs.length > 0 && question.trim() !== '') sendQuestion()"
+                    rows="1"
+                    class="block w-full pl-4 pr-14 py-3 bg-gray-50 border border-gray-300 rounded-2xl focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none overflow-hidden transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed" 
+                    :class="{'pl-10 border-amber-300 focus:border-amber-500 focus:ring-amber-500': selectedDocs.length === 0}"
+                    placeholder="Ask a question about your documents..."
+                    :disabled="loading"
+                    x-ref="questionInput"
+                    @input="adjustTextareaHeight($event.target)"></textarea>
+                
+                <button 
+                    @click="sendQuestion()" 
+                    :disabled="loading || question.trim() === '' || selectedDocs.length === 0"
+                    class="absolute right-2 bottom-2 p-2 rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center h-8 w-8">
+                    <i class="fa-solid fa-arrow-up text-sm"></i>
+                </button>
+            </div>
+            <div class="text-xs text-center mt-2 h-4">
+                <span x-show="selectedDocs.length === 0" class="text-amber-600">Please select at least one document from the sidebar.</span>
+                <span x-show="selectedDocs.length > 0" class="text-gray-500">Querying <span x-text="selectedDocs.length"></span> selected document(s). AI can make mistakes.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('askComponent', () => ({
+        messages: [],
+        question: '',
+        loading: false,
+        loadingDocs: false,
+        documents: [],
+        selectedDocs: [],
+        docSearch: '',
+        error: null,
+        
+        async init() {
+            this.loadingDocs = true;
+            try {
+                const response = await window.authenticatedFetch('/api/documents');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.documents = data.documents || [];
+                    if (this.documents.length > 0) {
+                        this.selectedDocs = [this.documents[0].id];
+                    }
+                } else {
+                    window.showToast('Failed to load documents', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                window.showToast('Error loading documents', 'error');
+            } finally {
+                this.loadingDocs = false;
+            }
+        },
+        
+        get filteredDocs() {
+            if (this.docSearch.trim() === '') {
+                return this.documents;
+            }
+            const q = this.docSearch.toLowerCase();
+            return this.documents.filter(doc => doc.filename.toLowerCase().includes(q));
+        },
+        
+        fillQuestion(text) {
+            this.question = text;
+            this.$refs.questionInput.focus();
+            this.$nextTick(() => {
+                this.adjustTextareaHeight(this.$refs.questionInput);
+            });
+        },
+        
+        adjustTextareaHeight(el) {
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight < 120 ? el.scrollHeight : 120) + 'px';
+        },
+        
+        scrollToBottom() {
+            this.$nextTick(() => {
+                const container = this.$refs.messagesContainer;
+                container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+            });
+        },
+        
+        formatMessage(content) {
+            if (!content) return '';
+            let html = content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br>');
+            return html;
+        },
+        
+        async sendQuestion() {
+            if (this.question.trim() === '' || this.selectedDocs.length === 0) return;
+            
+            const q = this.question.trim();
+            this.messages.push({ role: 'user', content: q });
+            this.question = '';
+            this.$refs.questionInput.style.height = 'auto';
+            this.scrollToBottom();
+            
+            this.loading = true;
+            
+            try {
+                let combinedAnswers = [];
+                let allCitations = [];
+                let lowestConfidence = 1.0;
+                let hasConfidence = false;
+                
+                for (let docId of this.selectedDocs) {
+                    const response = await window.authenticatedFetch(`/api/intelligence/ask/${docId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: q })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        let docObj = this.documents.find(d => d.id == docId);
+                        let docName = docObj ? docObj.filename : 'Document';
+                        
+                        if (data.answer) {
+                            if (this.selectedDocs.length > 1) {
+                                combinedAnswers.push(`**From ${docName}:**<br>${data.answer}`);
+                            } else {
+                                combinedAnswers.push(data.answer);
+                            }
+                        }
+                        
+                        if (data.confidence !== undefined) {
+                            hasConfidence = true;
+                            if (data.confidence < lowestConfidence) {
+                                lowestConfidence = data.confidence;
+                            }
+                        }
+                        
+                        if (data.citations && Array.isArray(data.citations)) {
+                            data.citations.forEach(c => {
+                                if (!c.filename) c.filename = docName;
+                            });
+                            allCitations = allCitations.concat(data.citations);
+                        }
+                    } else {
+                        console.error('Error querying doc', docId);
+                        window.showToast(`Error querying document ${docId}`, 'error');
+                    }
+                }
+                
+                if (combinedAnswers.length > 0) {
+                    this.messages.push({
+                        role: 'ai',
+                        content: combinedAnswers.join('<br><br>'),
+                        confidence: hasConfidence ? lowestConfidence : undefined,
+                        citations: allCitations
+                    });
+                } else {
+                    this.messages.push({
+                        role: 'ai',
+                        content: "Sorry, I couldn't generate an answer based on the selected documents."
+                    });
+                }
+                
+            } catch (err) {
+                console.error(err);
+                window.showToast('Failed to get answer', 'error');
+                this.messages.push({
+                    role: 'ai',
+                    content: "An error occurred while communicating with the intelligence service."
+                });
+            } finally {
+                this.loading = false;
+                this.scrollToBottom();
+            }
+        }
+    }));
+});
+</script>
+{% endblock %}

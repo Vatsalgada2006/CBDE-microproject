@@ -455,3 +455,34 @@ def upload_form_page():
     Render the document upload form HTML page.
     """
     return render_template('upload.html')
+
+
+@documents_bp.route('/deadlines/api', methods=['GET'])
+@token_required
+def get_deadlines_api():
+    """Get all documents with upcoming deadlines."""
+    try:
+        user_id = request.user['uid']
+        document_service = DocumentService()
+        docs = document_service.list_documents_by_owner(user_id)
+        
+        deadline_docs = [
+            doc for doc in docs 
+            if getattr(doc, 'deadline_date', None) is not None
+        ]
+        
+        # Sort by deadline (closest first)
+        deadline_docs.sort(key=lambda d: d.deadline_date)
+        
+        return jsonify({
+            'documents': [doc.to_dict() for doc in deadline_docs]
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching deadlines: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@documents_bp.route('/deadlines', methods=['GET'])
+def deadlines_page():
+    """Render the deadlines page."""
+    return render_template('deadlines.html', title='Upcoming Deadlines - IntelliDoc')

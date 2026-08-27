@@ -700,15 +700,14 @@ class IntelligenceService:
             # Generate embedding for the question
             question_embedding = self.embedding_service.generate_embedding(question)
             if question_embedding is None:
-                return {
-                    'answer': 'Unable to process the question due to embedding generation failure.',
-                    'confidence': 0.0,
-                    'source': 'embedding_error'
-                }
+                # Fallback: keyword-based search through chunks when embeddings unavailable
+                logger.warning("Embeddings unavailable, falling back to keyword matching")
+                return self._keyword_fallback_answer(chunks, question, doc_dict)
 
             # Generate embeddings for all chunks and compute similarities
             chunk_embeddings = []
             valid_chunks = []
+            chunk_indices = []
             
             for i, chunk in enumerate(chunks):
                 if not chunk or not chunk.strip():
@@ -718,15 +717,12 @@ class IntelligenceService:
                 if chunk_embedding is not None:
                     chunk_embeddings.append(chunk_embedding)
                     valid_chunks.append(chunk)
+                    chunk_indices.append(i)
                 else:
                     logger.warning(f"Failed to generate embedding for chunk {i}")
 
             if not chunk_embeddings:
-                return {
-                    'answer': 'Unable to process document text due to embedding generation failure.',
-                    'confidence': 0.0,
-                    'source': 'chunk_embedding_error'
-                }
+                return self._keyword_fallback_answer(chunks, question, doc_dict)
 
             # Compute similarities between question and chunks
             import numpy as np
@@ -753,31 +749,99 @@ class IntelligenceService:
             # Get the selected chunks
             selected_chunks = [valid_chunks[i] for i in top_indices]
             selected_similarities = [similarities[i] for i in top_indices]
+            selected_chunk_numbers = [chunk_indices[i] for i in top_indices]
             
             # Combine selected chunks into context
             context = "\n\n---\n\n".join(selected_chunks)
             
             # Use LLM service to answer the question based on context
+            if not self.llm_service.is_available():
+                # Fallback: return chunks directly without LLM synthesis
+                return {
+                    'answer': f"LLM service is not configured. Here are the most relevant passages from your document:\n\n" +
+                              "\n\n---\n\n".join([c[:500] for c in selected_chunks]),
+                    'confidence': float(max(selected_similarities)) if selected_similarities else 0.0,
+                    'source': 'chunks_only',
+                    'citations': [
+                        {
+                            'chunk_index': int(selected_chunk_numbers[i]),
+                            'text': selected_chunks[i][:300],
+                            'relevance': round(float(selected_similarities[i]), 3),
+                            'document_name': doc_dict.get('filename', 'Unknown')
+                        }
+                        for i in range(len(selected_chunks))
+                    ]
+                }
+
             llm_response = self.llm_service.answer_question(context, question)
             
-            # Format the response
+            # Format the response with citations
             answer = llm_response.get('answer', 'Unable to generate an answer.')
             confidence = llm_response.get('confidence', 0.5)
             
-            # Add source information
+            # Build chunk-level citations
+            citations = []
+            for i in range(len(selected_chunks)):
+                citations.append({
+                    'chunk_index': int(selected_chunk_numbers[i]),
+                    'text': selected_chunks[i][:300],
+                    'relevance': round(float(selected_similarities[i]), 3),
+                    'document_name': doc_dict.get('filename', 'Unknown')
+                })
+
             result = {
                 'answer': answer,
                 'confidence': confidence,
                 'source': 'rag_llm',
                 'context_chunks_used': len(selected_chunks),
-                'context_similarities': [float(s) for s in selected_similarities]  # Convert to float for JSON serialization
+                'context_similarities': [float(s) for s in selected_similarities],
+                'citations': citations,
+                'document_id': document_id
             }
             
             return result
 
         except Exception as e:
             logger.error(f"Error answering question about document {document_id}: {e}")
-            return {'answer': 'Error processing question', 'confidence': 0.0}
+            return {'answer': 'An error occurred while processing your question. Please try again.', 'confidence': 0.0, 'source': 'error'}
+
+    def _keyword_fallback_answer(self, chunks: List[str], question: str, doc_dict: dict) -> Dict:
+        """Fallback Q&A using simple keyword matching when embeddings/LLM are unavailable."""
+        question_words = set(question.lower().split())
+        scored = []
+        for i, chunk in enumerate(chunks):
+            if not chunk or not chunk.strip():
+                continue
+            chunk_words = set(chunk.lower().split())
+            overlap = len(question_words & chunk_words)
+            if overlap > 0:
+                scored.append((overlap / len(question_words), i, chunk))
+        
+        scored.sort(reverse=True)
+        top = scored[:3]
+        
+        if not top:
+            return {
+                'answer': 'No relevant passages found for your question in this document.',
+                'confidence': 0.0,
+                'source': 'keyword_fallback'
+            }
+        
+        return {
+            'answer': 'Here are the most relevant passages (keyword match):\n\n' +
+                      '\n\n---\n\n'.join([c[:500] for _, _, c in top]),
+            'confidence': round(top[0][0], 2),
+            'source': 'keyword_fallback',
+            'citations': [
+                {
+                    'chunk_index': idx,
+                    'text': chunk[:300],
+                    'relevance': round(score, 3),
+                    'document_name': doc_dict.get('filename', 'Unknown')
+                }
+                for score, idx, chunk in top
+            ]
+        }
     def cleanup_old_extracted_text(self, max_age_hours: int = 24) -> int:
         """
         Clean up extracted text older than the specified age.

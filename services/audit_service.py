@@ -26,5 +26,41 @@ class AuditService:
             logger.error(f"Failed to save audit log: {e}")
             raise
 
+    def get_user_audit_logs(self, user_id: str, limit: int = 50):
+        """Retrieve recent audit logs for a specific user."""
+        try:
+            query = self.db.collection(self.collection)\
+                .where('user_id', '==', user_id)\
+                .order_by('created_at', direction='DESCENDING')\
+                .limit(limit)
+            
+            logs = []
+            for doc in query.stream():
+                data = doc.to_dict()
+                # Handle Firestore datetime mapping
+                if 'created_at' in data and hasattr(data['created_at'], 'timestamp'):
+                    from datetime import datetime, timezone
+                    data['created_at'] = datetime.fromtimestamp(data['created_at'].timestamp(), tz=timezone.utc)
+                logs.append(AuditLog.from_dict(data))
+            
+            return logs
+        except Exception as e:
+            logger.error(f"Failed to fetch audit logs for user {user_id}: {e}")
+            # If index is missing, fallback to client-side sort
+            if 'index' in str(e).lower():
+                logger.warning("Falling back to client-side sorting due to missing index")
+                query = self.db.collection(self.collection).where('user_id', '==', user_id).stream()
+                logs = []
+                for doc in query:
+                    data = doc.to_dict()
+                    if 'created_at' in data and hasattr(data['created_at'], 'timestamp'):
+                        from datetime import datetime, timezone
+                        data['created_at'] = datetime.fromtimestamp(data['created_at'].timestamp(), tz=timezone.utc)
+                    logs.append(AuditLog.from_dict(data))
+                
+                logs.sort(key=lambda x: x.created_at, reverse=True)
+                return logs[:limit]
+            return []
+
 # Create a singleton instance
 audit_service = AuditService()
