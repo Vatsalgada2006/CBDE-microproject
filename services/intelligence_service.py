@@ -22,6 +22,7 @@ class IntelligenceService:
     def __init__(self):
         self.extraction_service = ExtractionService()
         # Lazy initialization of heavy services
+        self._llm_service = None
         self._embedding_service = None
         self.chunking_service = ChunkingService()
         self.action_service = ActionService()
@@ -43,6 +44,14 @@ class IntelligenceService:
             self._embedding_service = EmbeddingService()
         return self._embedding_service
 
+    @property
+    def llm_service(self):
+        """Lazy load the LLM service to avoid loading the model at startup."""
+        if self._llm_service is None:
+            from services.llm_service import LLMService
+            self._llm_service = LLMService()
+        return self._llm_service
+
     def process_document(self, document: Document, file_path: str) -> Document:
         """
         Process a document: extract text, generate embedding, extract actions, classify,
@@ -62,6 +71,30 @@ class IntelligenceService:
             # Store the extracted text for later use (with timestamp for potential TTL)
             self._store_extracted_text(document.doc_id, extracted_text)
         else:
+            # Store the extracted text for later use (with timestamp for potential TTL)
+            self._store_extracted_text(document.doc_id, extracted_text)
+
+            # Step 2.5: Generate LLM-based summary and key points
+            logger.info(f"Generating LLM-based summary and key points for document {document.doc_id}")
+            try:
+                # Generate abstractive summary using LLM service
+                if self.llm_service.is_available():
+                    llm_summary = self.llm_service.generate_summary(extracted_text, max_length=200)
+                    if llm_summary and llm_summary.strip():
+                        document.llm_summary = llm_summary.strip()
+                        logger.info(f"Generated LLM summary for document {document.doc_id}: {llm_summary[:50]}...")
+                
+                # Extract key points using LLM service
+                if self.llm_service.is_available():
+                    key_points = self.llm_service.extract_key_points(extracted_text, num_points=5)
+                    if key_points:
+                        document.llm_key_points = key_points
+                        logger.info(f"Extracted {len(key_points)} key points for document {document.doc_id}")
+            except Exception as e:
+                logger.warning(f"LLM processing failed for document {document.doc_id}: {e}")
+                # Continue with processing even if LLM fails
+
+        # Step 2: Generate embedding
             document.extraction_status = "failed"
             logger.warning(f"Text extraction failed for document {document.doc_id}")
             document.intelligence_status = "failed"
@@ -308,8 +341,7 @@ class IntelligenceService:
     def summarize_document(self, document_id: str) -> str:
         """
         Generate a summary of the document using its extracted text.
-        This is a placeholder implementation that uses extractive summarization.
-        In a real app, this would use an LLM for abstractive summarization.
+        Uses LLM service for abstractive summarization with extractive fallback.
         """
         try:
             # Get document metadata
@@ -327,8 +359,17 @@ class IntelligenceService:
                 # Fall back to placeholder if no extracted text is available
                 return f"Summary of {doc_dict.get('filename', 'document')}: This document contains important information that has been processed by our AI system. Key topics include document processing, information extraction, and intelligent document management."
 
-            # Simple extractive summarization: take first few sentences
-            # In a real implementation, we would use an LLM for better summarization
+            # Try to use LLM service for summarization
+            if self.llm_service.is_available():
+                try:
+                    # Generate summary using LLM service
+                    llm_summary = self.llm_service.generate_summary(extracted_text, max_length=200)
+                    if llm_summary and llm_summary.strip():
+                        return f"Summary of {doc_dict.get('filename', 'document')}: {llm_summary}"
+                except Exception as e:
+                    logger.warning(f"LLM summarization failed, falling back to extractive: {e}")
+            
+            # Fallback to extractive summarization
             import re
             # Split into sentences (simple approach)
             sentences = re.split(r'[.!?]+', extracted_text)
@@ -343,8 +384,41 @@ class IntelligenceService:
             return f"Summary of {doc_dict.get('filename', 'document')}: {summary}"
         except Exception as e:
             logger.error(f"Error summarizing document {document_id}: {e}")
-            return "Unable to generate summary"
+            return "Unable to generate summary due to an error."
+        """
+        Extract key bullet points from the document using the LLM service.
+        Returns a list of strings (each string is a bullet point).
+        """
+        try:
+            # Get document metadata
+            doc_ref = self.db.collection('documents').document(document_id)
+            doc_data = doc_ref.get()
+            if not doc_data.exists:
+                return []
 
+            # Convert to dictionary for consistent access
+            doc_dict = doc_data.to_dict()
+
+            # Get the extracted text
+            extracted_text = self._get_extracted_text(document_id)
+            if not extracted_text:
+                return []
+
+            # Try to use LLM service for key point extraction
+            if self.llm_service.is_available():
+                try:
+                    # Extract key points using LLM service
+                    key_points = self.llm_service.extract_key_points(extracted_text, num_points)
+                    if key_points:
+                        return key_points
+                except Exception as e:
+                    logger.warning(f"LLM key point extraction failed, falling back to empty: {e}")
+            
+            # Fallback to empty list (we could implement extractive key point extraction here,             # but for simplicity we'll return empty if LLM is not available)
+            return []
+        except Exception as e:
+            logger.error(f"Error extracting key points from document {document_id}: {e}")
+            return []
     def semantic_search(self, query: str, owner_id: str, limit: int = 10) -> List[Dict]:
         """
         Perform semantic search on documents using embeddings.
@@ -542,94 +616,137 @@ class IntelligenceService:
 
     def ask_document_question(self, document_id: str, question: str) -> Dict:
         """
-        Answer a question about a document using its content.
-        This is a more natural way to interact with documents.
+        Answer a question about a document using its content with RAG+LLM approach.
+        This retrieves relevant chunks from the document and uses an LLM to answer based on the context.
         """
         try:
-            # Get document
+            # Get document metadata
             doc_ref = self.db.collection('documents').document(document_id)
             doc_data = doc_ref.get()
             if not doc_data.exists:
                 return {'answer': 'Document not found', 'confidence': 0.0}
 
-            # Get actions first (high confidence matches)
-            actions = []
-            try:
-                actions_query = self.actions_collection.where('document_id', '==', document_id)
-                for action_doc in actions_query.stream():
-                    actions.append(Action.from_dict(action_doc.to_dict()).to_dict())
-            except Exception as e:
-                logger.error(f"Error fetching actions for QA: {e}")
+            # Convert to dictionary for consistent access
+            doc_dict = doc_data.to_dict()
 
-            # Simple keyword matching for actions
-            question_lower = question.lower()
-            question_words = set([word for word in question_lower.split() if len(word) > 3])
-            for action in actions:
-                action_text = action.get('action', '').lower()
-                action_words = set([word for word in action_text.split() if len(word) > 3])
-                # If there's significant word overlap, answer based on the action
-                if question_words and action_words:
-                    overlap = question_words.intersection(action_words)
-                    if len(overlap) >= min(2, len(question_words) // 2):  # At least 2 words or half the question words
-                        return {
-                            'answer': f"Based on the document, you need to: {action.get('action')}",
-                            'confidence': 0.8,
-                            'source': 'action',
-                            'action_id': action.get('action_id')
-                        }
-
-            # If no action match, look for relevant content in the extracted text
+            # Get the extracted text
             extracted_text = self._get_extracted_text(document_id)
-            if extracted_text:
-                # Simple approach: find sentences that contain question words
-                import re
-                # Split into sentences
-                sentences = re.split(r'[.!?]+', extracted_text)
-                sentences = [s.strip() for s in sentences if s.strip()]
+            if not extracted_text:
+                return {
+                    'answer': 'No text content found in the document to answer questions.',
+                    'confidence': 0.0,
+                    'source': 'no_text'
+                }
 
-                # Score sentences based on question word overlap
-                scored_sentences = []
-                for sentence in sentences:
-                    sentence_lower = sentence.lower()
-                    sentence_words = set([word for word in sentence_lower.split() if len(word) > 3])
-                    if sentence_words:
-                        overlap = question_words.intersection(sentence_words)
-                        if overlap:
-                            # Score based on overlap ratio
-                            score = len(overlap) / len(question_words)
-                            scored_sentences.append((sentence, score))
+            # If question is empty, return early
+            if not question or not question.strip():
+                return {
+                    'answer': 'Please provide a question to answer.',
+                    'confidence': 0.0,
+                    'source': 'invalid_question'
+                }
 
-                # Sort by score and take the best ones
-                scored_sentences.sort(key=lambda x: x[1], reverse=True)
-                top_sentences = scored_sentences[:3]  # Top 3 sentences
+            # Chunk the text if it's too long
+            # We'll use chunks of 1000 characters with 200 character overlap
+            max_chunk_size = 1000
+            overlap_size = 200
+            
+            chunks = []
+            if len(extracted_text) <= max_chunk_size:
+                # Text is short enough, use as single chunk
+                chunks = [extracted_text]
+            else:
+                # Split into overlapping chunks
+                start = 0
+                while start < len(extracted_text):
+                    end = start + max_chunk_size
+                    chunk = extracted_text[start:end]
+                    chunks.append(chunk)
+                    start = end - overlap_size  # Move start back by overlap for next chunk
+                    if start >= len(extracted_text):
+                        break
 
-                if top_sentences:
-                    # Combine the top sentences into an answer
-                    answer_text = ' '.join([sent[0] for sent in top_sentences])
-                    # Calculate average confidence
-                    avg_confidence = sum([sent[1] for sent in top_sentences]) / len(top_sentences)
-                    # Cap confidence at 0.9 since this is still a simple algorithm
-                    confidence = min(0.9, avg_confidence)
+            # Generate embedding for the question
+            question_embedding = self.embedding_service.generate_embedding(question)
+            if question_embedding is None:
+                return {
+                    'answer': 'Unable to process the question due to embedding generation failure.',
+                    'confidence': 0.0,
+                    'source': 'embedding_error'
+                }
 
-                    return {
-                        'answer': answer_text,
-                        'confidence': confidence,
-                        'source': 'extracted_text',
-                        'sentences_used': len(top_sentences)
-                    }
+            # Generate embeddings for all chunks and compute similarities
+            chunk_embeddings = []
+            valid_chunks = []
+            
+            for i, chunk in enumerate(chunks):
+                if not chunk or not chunk.strip():
+                    continue
+                    
+                chunk_embedding = self.embedding_service.generate_embedding(chunk)
+                if chunk_embedding is not None:
+                    chunk_embeddings.append(chunk_embedding)
+                    valid_chunks.append(chunk)
+                else:
+                    logger.warning(f"Failed to generate embedding for chunk {i}")
 
-            # If we still don't have a good answer, return a placeholder
-            return {
-                'answer': f"I couldn't find specific information in the document to answer: '{question}'. The document has been processed and contains {len(extracted_text) if extracted_text else 0} characters of text, but I need more advanced AI capabilities to provide a detailed answer to this question.",
-                'confidence': 0.3,
-                'source': 'placeholder',
-                'extracted_text_length': len(extracted_text) if extracted_text else 0
+            if not chunk_embeddings:
+                return {
+                    'answer': 'Unable to process document text due to embedding generation failure.',
+                    'confidence': 0.0,
+                    'source': 'chunk_embedding_error'
+                }
+
+            # Compute similarities between question and chunks
+            import numpy as np
+            similarities = []
+            for chunk_embedding in chunk_embeddings:
+                # Cosine similarity
+                similarity = np.dot(question_embedding, chunk_embedding) / (
+                    np.linalg.norm(question_embedding) * np.linalg.norm(chunk_embedding)
+                )
+                similarities.append(similarity)
+
+            # Get top N chunks (we'll use top 3 or fewer if we have fewer chunks)
+            top_n = min(3, len(similarities))
+            if top_n == 0:
+                return {
+                    'answer': 'Unable to find relevant content in the document to answer the question.',
+                    'confidence': 0.0,
+                    'source': 'no_similarity'
+                }
+
+            # Get indices of top similarities
+            top_indices = np.argsort(similarities)[-top_n:][::-1]  # Descending order
+            
+            # Get the selected chunks
+            selected_chunks = [valid_chunks[i] for i in top_indices]
+            selected_similarities = [similarities[i] for i in top_indices]
+            
+            # Combine selected chunks into context
+            context = "\n\n---\n\n".join(selected_chunks)
+            
+            # Use LLM service to answer the question based on context
+            llm_response = self.llm_service.answer_question(context, question)
+            
+            # Format the response
+            answer = llm_response.get('answer', 'Unable to generate an answer.')
+            confidence = llm_response.get('confidence', 0.5)
+            
+            # Add source information
+            result = {
+                'answer': answer,
+                'confidence': confidence,
+                'source': 'rag_llm',
+                'context_chunks_used': len(selected_chunks),
+                'context_similarities': [float(s) for s in selected_similarities]  # Convert to float for JSON serialization
             }
+            
+            return result
 
         except Exception as e:
             logger.error(f"Error answering question about document {document_id}: {e}")
             return {'answer': 'Error processing question', 'confidence': 0.0}
-
     def cleanup_old_extracted_text(self, max_age_hours: int = 24) -> int:
         """
         Clean up extracted text older than the specified age.

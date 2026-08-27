@@ -6,7 +6,8 @@ class Document:
                  size=0, storage_path=None, CreatedAt=None, UpdatedAt=None,
                  folder_id=None, tags=None, extraction_status="pending",
                  intelligence_status="pending", hash=None, version=1,
-                 embedding: Optional[List[float]] = None, is_favorite=False):
+                 embedding: Optional[List[float]] = None, is_favorite=False,
+                 llm_summary: Optional[str] = None, llm_key_points: Optional[List[str]] = None):
         self.doc_id = doc_id
         self.owner_id = owner_id
         self.filename = filename
@@ -23,7 +24,9 @@ class Document:
         self.version = version  # version number for versioning
         self.embedding = embedding  # list of floats representing the document embedding
         self.is_favorite = is_favorite  # whether the document is marked as favorite
-    
+        self.llm_summary = llm_summary  # LLM-generated summary of the document
+        self.llm_key_points = llm_key_points or []  # LLM-extracted key points list
+
     def to_dict(self):
         return {
             'doc_id': self.doc_id,
@@ -41,9 +44,11 @@ class Document:
             'hash': self.hash,
             'version': self.version,
             'embedding': self.embedding,
-            'is_favorite': self.is_favorite
+            'is_favorite': self.is_favorite,
+            'llm_summary': self.llm_summary,
+            'llm_key_points': self.llm_key_points
         }
-    
+
     @staticmethod
     def from_dict(data):
         return Document(
@@ -62,5 +67,7 @@ class Document:
             hash=data.get('hash'),
             version=data.get('version', 1),
             embedding=data.get('embedding'),
-            is_favorite=data.get('is_favorite', False)
+            is_favorite=data.get('is_favorite', False),
+            llm_summary=data.get('llm_summary'),
+            llm_key_points=data.get('llm_key_points', [])
         )
