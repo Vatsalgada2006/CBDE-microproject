@@ -1,6 +1,5 @@
 import logging
-from firebase_admin import firestore
-from config import Config
+from services.firebase_service import firestore_db
 from models.audit_log import AuditLog
 import uuid
 
@@ -8,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class AuditService:
     def __init__(self):
-        self.db = firestore.client()
+        self.db = firestore_db
         self.collection = 'audit_logs'
 
     def log_action(self, audit_log: AuditLog):
