@@ -24,6 +24,9 @@ class Config:
     FIREBASE_PRIVATE_KEY = os.environ.get('FIREBASE_PRIVATE_KEY')
     FIREBASE_PRIVATE_KEY_ID = os.environ.get('FIREBASE_PRIVATE_KEY_ID')
     FIREBASE_STORAGE_BUCKET = os.environ.get('FIREBASE_STORAGE_BUCKET')
+    FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY")
+    FIREBASE_MESSAGESENDER_ID = os.environ.get("FIREBASE_MESSAGESENDER_ID")
+    FIREBASE_APP_ID = os.environ.get("FIREBASE_APP_ID")
 
     # Other settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB upload limit

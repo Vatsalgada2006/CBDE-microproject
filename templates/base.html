@@ -24,12 +24,12 @@
     <script>
         // Firebase configuration - replace with your actual Firebase project config
         const firebaseConfig = {
-            apiKey: "AIzaSyDummyApiKeyForDemoPurposesReplaceWithRealKey",
+            apiKey: "{{ config.FIREBASE_API_KEY }}",
             authDomain: "{{ config.FIREBASE_PROJECT_ID }}.firebaseapp.com",
             projectId: "{{ config.FIREBASE_PROJECT_ID }}",
             storageBucket: "{{ config.FIREBASE_STORAGE_BUCKET }}",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:dummyappidfornow"
+            messagingSenderId: "{{ config.FIREBASE_MESSAGESENDER_ID }}",
+            appId: "{{ config.FIREBASE_APP_ID }}"
         };
     </script>
 
@@ -329,26 +329,29 @@
                     location.reload();
                 } else {
                     throw new Error('Failed to verify token');
-                }
-            } catch (error) {
+            }
+             catch (error) {
                 console.error('Login error:', error);
-                showAuthError(null, 'Invalid email or password');
+                let message = 'Login failed. Please try again.';
+                if (error.code === 'auth/invalid-api-key') {
+                    message = 'Authentication service misconfigured. Please contact support.';
+                } else if (error.code === 'auth/invalid-email') {
+                    message = 'Invalid email address.';
+                    showAuthError('loginEmail', message);
+                    return;
+                } else if (error.code === 'auth/user-disabled') {
+                    message = 'This account has been disabled. Please contact support.';
+                } else if (error.code === 'auth/user-not-found') {
+                    message = 'No account found with this email.';
+                } else if (error.code === 'auth/wrong-password') {
+                    message = 'Incorrect password.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    message = 'Too many attempts. Please try again later.';
             } finally {
                 showAuthLoading(false);
             }
-        }
-
-        // Handle registration with email/password
-        async function handleRegister() {
-            const name = document.getElementById('registerName').value.trim();
-            const email = document.getElementById('registerEmail').value.trim();
-            const password = document.getElementById('registerPassword').value.trim();
-            const confirmPassword = document.getElementById('registerConfirmPassword').value.trim();
-
-            if (!name) {
-                showAuthError('registerName', 'Please enter your full name');
-                return;
-            }
+                }
+                showAuthError(null, message);
 
             if (!email) {
                 showAuthError('registerEmail', 'Please enter your email');
@@ -400,16 +403,26 @@
                 } else {
                     throw new Error('Failed to verify token');
                 }
-            } catch (error) {
-                console.error('Registration error:', error);
-                if (error.code === 'auth/email-already-in-use') {
-                    showAuthError('registerEmail', 'This email is already registered');
-                } else {
-                    showAuthError(null, 'Registration failed. Please try again.');
-                }
-            } finally {
-                showAuthLoading(false);
             }
+             catch (error) {
+                console.error('Registration error:', error);
+                let message = 'Registration failed. Please try again.';
+                if (error.code === 'auth/invalid-api-key') {
+                    message = 'Authentication service misconfigured. Please contact support.';
+                } else if (error.code === 'auth/invalid-email') {
+                    message = 'Invalid email address.';
+                    showAuthError('registerEmail', message);
+                    return;
+                } else if (error.code === 'auth/email-already-in-use') {
+                    showAuthError('registerEmail', 'This email is already registered');
+                } else if (error.code === 'auth/weak-password') {
+                    message = 'Password should be at least 6 characters.';
+                    showAuthError('registerPassword', message);
+                    return;
+                } else if (error.code === 'auth/too-many-requests') {
+                    message = 'Too many attempts. Please try again later.';
+                }
+                showAuthError(null, message);
         }
 
         // Handle sign in with provider (Google, GitHub, etc.)
@@ -447,16 +460,29 @@
                     location.reload();
                 } else {
                     throw new Error('Failed to verify token');
-                }
-            } catch (error) {
+            }
+
+             catch (error) {
                 console.error(`Provider sign-in error (${provider}):`, error);
-                showAuthError(null, 'Sign-in failed. Please try again.');
-            } finally {
+                let message = 'Sign-in failed. Please try again.';
+                if (error.code === 'auth/invalid-api-key') {
+                    message = 'Authentication service misconfigured. Please contact support.';
+                } else if (error.code === 'auth/account-exists-with-different-credential') {
+                    message = 'An account already exists with the same email address but different sign-in credentials. Please use a different sign-in method.';
+                } else if (error.code === 'auth/credential-already-in-use') {
+                    message = 'This account is already linked with a different provider. Please sign in using that provider.';
+                } else if (error.code === 'auth/invalid-credential') {
+                    message = 'Invalid credential provided. Please check your sign-in details.';
+                } else if (error.code === 'auth/operation-not-allowed') {
+                    message = 'This sign-in method is not enabled. Please contact support.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    message = 'Too many attempts. Please try again later.';
+                }
+                showAuthError(null, message);
                 showAuthLoading(false);
+            } finally {
             }
         }
-
-        // Show auth error
         function showAuthError(fieldId, message) {
             if (fieldId) {
                 const field = document.getElementById(fieldId);
