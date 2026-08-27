@@ -111,3 +111,41 @@ class ClassificationService:
             return self.default_category, best_score
         else:
             return best_category, best_score
+
+    def classify_sensitivity(self, text: str) -> str:
+        """
+        Classify the document sensitivity level based on keywords.
+        Returns one of: 'public', 'internal', 'confidential', 'restricted'.
+        """
+        if not text:
+            return 'internal'  # Default
+
+        text_lower = text.lower()
+
+        restricted_keywords = [
+            'ssn', 'social security', 'credit card number', 'passport number',
+            'top secret', 'highly confidential', 'trade secret',
+        ]
+        confidential_keywords = [
+            'confidential', 'nda', 'non-disclosure', 'proprietary',
+            'attorney-client', 'financial statement', 'salary', 'payroll',
+            'medical record', 'hipaa', 'gdpr',
+        ]
+        public_keywords = [
+            'press release', 'public domain', 'for immediate release',
+            'open source', 'newsletter', 'blog post',
+        ]
+
+        for k in restricted_keywords:
+            if k in text_lower:
+                return 'restricted'
+
+        for k in confidential_keywords:
+            if k in text_lower:
+                return 'confidential'
+
+        for k in public_keywords:
+            if k in text_lower:
+                return 'public'
+
+        return 'internal'

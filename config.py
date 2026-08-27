@@ -13,9 +13,7 @@ class Config:
             SECRET_KEY = 'dev-secret-key-change-me'
             logging.warning('Using default SECRET_KEY for development. Set FLASK_SECRET_KEY in production.')
         else:
-            # Generate a random secret key for production if not set
-            SECRET_KEY = os.urandom(24).hex()
-            logging.warning('Using randomly generated SECRET_KEY for production. Set FLASK_SECRET_KEY in production for security.')
+            raise ValueError("FLASK_SECRET_KEY must be configured in production environment!")
 
     # Firebase configuration
     FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID')

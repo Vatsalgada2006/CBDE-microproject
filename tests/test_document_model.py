@@ -34,6 +34,16 @@ def test_document_creation():
     assert doc.folder_id is None
     assert doc.CreatedAt is not None
     assert doc.UpdatedAt is not None
+    assert doc.title is None
+    assert doc.document_type is None
+    assert doc.classification_confidence is None
+    assert doc.starred == False
+    assert doc.processing_status == "pending"
+    assert doc.detected_language is None
+    assert doc.page_count is None
+    assert doc.deadline_date is None
+    assert doc.sensitivity_level is None
+    assert doc.entities == []
 
 
 def test_document_to_from_dict():
@@ -41,6 +51,7 @@ def test_document_to_from_dict():
     # Create a document with all fields
     created_at = datetime.now(timezone.utc)
     updated_at = datetime.now(timezone.utc)
+    deadline_at = datetime(2026, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
     
     original_doc = Document(
         doc_id="doc123",
@@ -57,7 +68,17 @@ def test_document_to_from_dict():
         tags=["important", "contract"],
         folder_id="folder456",
         CreatedAt=created_at,
-        UpdatedAt=updated_at
+        UpdatedAt=updated_at,
+        title="Master Services Agreement",
+        document_type="contract",
+        classification_confidence=0.98,
+        starred=True,
+        processing_status="completed",
+        detected_language="en",
+        page_count=5,
+        deadline_date=deadline_at,
+        sensitivity_level="confidential",
+        entities=["Acme Corp", "John Doe"]
     )
 
     # Convert to dict
@@ -77,6 +98,16 @@ def test_document_to_from_dict():
     assert doc_dict['version'] == 2
     assert doc_dict['CreatedAt'] == created_at
     assert doc_dict['UpdatedAt'] == updated_at
+    assert doc_dict['title'] == "Master Services Agreement"
+    assert doc_dict['document_type'] == "contract"
+    assert doc_dict['classification_confidence'] == 0.98
+    assert doc_dict['starred'] == True
+    assert doc_dict['processing_status'] == "completed"
+    assert doc_dict['detected_language'] == "en"
+    assert doc_dict['page_count'] == 5
+    assert doc_dict['deadline_date'] == deadline_at
+    assert doc_dict['sensitivity_level'] == "confidential"
+    assert doc_dict['entities'] == ["Acme Corp", "John Doe"]
 
     # Create from dict
     restored_doc = Document.from_dict(doc_dict)
@@ -96,6 +127,16 @@ def test_document_to_from_dict():
     assert restored_doc.CreatedAt == original_doc.CreatedAt
     assert restored_doc.UpdatedAt == original_doc.UpdatedAt
     assert restored_doc.doc_id == original_doc.doc_id
+    assert restored_doc.title == original_doc.title
+    assert restored_doc.document_type == original_doc.document_type
+    assert restored_doc.classification_confidence == original_doc.classification_confidence
+    assert restored_doc.starred == original_doc.starred
+    assert restored_doc.processing_status == original_doc.processing_status
+    assert restored_doc.detected_language == original_doc.detected_language
+    assert restored_doc.page_count == original_doc.page_count
+    assert restored_doc.deadline_date == original_doc.deadline_date
+    assert restored_doc.sensitivity_level == original_doc.sensitivity_level
+    assert restored_doc.entities == original_doc.entities
 
 
 def test_document_default_values():
@@ -117,6 +158,16 @@ def test_document_default_values():
     assert doc.storage_path is None
     assert doc.hash is None
     assert doc.folder_id is None
+    assert doc.title is None
+    assert doc.document_type is None
+    assert doc.classification_confidence is None
+    assert doc.starred == False
+    assert doc.processing_status == "pending"
+    assert doc.detected_language is None
+    assert doc.page_count is None
+    assert doc.deadline_date is None
+    assert doc.sensitivity_level is None
+    assert doc.entities == []
 
 
 def test_document_from_dict_missing_fields():
@@ -145,6 +196,16 @@ def test_document_from_dict_missing_fields():
     assert doc.folder_id is None  # not provided
     assert doc.CreatedAt is not None  # should be set
     assert doc.UpdatedAt is not None  # should be set
+    assert doc.title is None
+    assert doc.document_type is None
+    assert doc.classification_confidence is None
+    assert doc.starred == False
+    assert doc.processing_status == "pending"
+    assert doc.detected_language is None
+    assert doc.page_count is None
+    assert doc.deadline_date is None
+    assert doc.sensitivity_level is None
+    assert doc.entities == []
 
 
 if __name__ == "__main__":

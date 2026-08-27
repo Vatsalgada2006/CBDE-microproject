@@ -300,3 +300,101 @@ def ask_document_question(doc_id):
     result = intelligence_service.ask_document_question(doc_id, question.strip())
 
     return jsonify(result), 200
+
+
+# ==========================================
+# Phase 5: Inbox, Suggestions, and Health
+# ==========================================
+
+def get_suggestion_service():
+    from services.suggestion_service import SuggestionService
+    return SuggestionService()
+
+
+@intelligence_bp.route('/inbox', methods=['GET'])
+@token_required
+def get_inbox():
+    """Get all documents with pending AI suggestions."""
+    try:
+        user_id = request.user['uid']
+        suggestion_service = get_suggestion_service()
+        docs = suggestion_service.get_inbox_items(user_id)
+        return jsonify({'documents': [d.to_dict() for d in docs]}), 200
+    except Exception as e:
+        logger.error(f"Error fetching inbox: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@intelligence_bp.route('/<doc_id>/accept-suggestions', methods=['POST'])
+@token_required
+def accept_suggestions(doc_id):
+    """Accept specific AI suggestions."""
+    try:
+        user_id = request.user['uid']
+        data = request.json or {}
+        accepted_fields = data.get('accepted_fields', {})
+
+        suggestion_service = get_suggestion_service()
+        success = suggestion_service.accept_suggestions(doc_id, user_id, accepted_fields)
+        if success:
+            return jsonify({'message': 'Suggestions accepted successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to accept suggestions or unauthorized'}), 400
+    except Exception as e:
+        logger.error(f"Error accepting suggestions: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@intelligence_bp.route('/<doc_id>/reject-suggestions', methods=['POST'])
+@token_required
+def reject_suggestions(doc_id):
+    """Reject AI suggestions."""
+    try:
+        user_id = request.user['uid']
+        suggestion_service = get_suggestion_service()
+        success = suggestion_service.reject_suggestions(doc_id, user_id)
+        if success:
+            return jsonify({'message': 'Suggestions rejected successfully'}), 200
+        else:
+            return jsonify({'error': 'Failed to reject suggestions or unauthorized'}), 400
+    except Exception as e:
+        logger.error(f"Error rejecting suggestions: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@intelligence_bp.route('/health', methods=['GET'])
+@token_required
+def get_library_health():
+    """Calculate a library health score."""
+    try:
+        user_id = request.user['uid']
+        document_service = get_document_service()
+        docs = document_service.list_documents_by_owner(user_id)
+
+        if not docs:
+            return jsonify({'health_score': 100, 'issues': []}), 200
+
+        issues = []
+        missing_titles = [d for d in docs if not d.title]
+        missing_tags = [d for d in docs if not d.tags]
+
+        score = 100
+        if len(missing_titles) > 0:
+            penalty = min(20, int((len(missing_titles) / len(docs)) * 40))
+            score -= penalty
+            issues.append(f"{len(missing_titles)} documents missing a title (-{penalty})")
+
+        if len(missing_tags) > 0:
+            penalty = min(15, int((len(missing_tags) / len(docs)) * 30))
+            score -= penalty
+            issues.append(f"{len(missing_tags)} documents have no tags (-{penalty})")
+
+        return jsonify({
+            'health_score': max(0, score),
+            'issues': issues,
+            'total_documents_analyzed': len(docs)
+        }), 200
+    except Exception as e:
+        logger.error(f"Error calculating health: {e}")
+        return jsonify({'error': str(e)}), 500
+

@@ -1,736 +1,280 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="page-header fade-in fade-in-delay-1">
-    <div class="flex items-center justify-between mb-4">
-        <div>
-            <h1><i class="fas fa-eye holographic"></i> Document Preview</h1>
-            <p class="text-gray-400">View and interact with your document</p>
+<div x-data="documentViewer('{{ doc_id }}')" x-init="initData()" class="h-full flex flex-col -m-6">
+    <!-- Header -->
+    <div class="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6 shrink-0">
+        <div class="flex items-center gap-4">
+            <a href="/documents/view" class="text-gray-400 hover:text-gray-900 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="w-8 h-8 rounded text-lg flex items-center justify-center shrink-0" :class="getFileIconColor(doc.filename)">
+                <i :class="getFileIcon(doc.filename)"></i>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 leading-tight" x-text="doc.filename || 'Loading...'"></h2>
+                <p class="text-xs text-gray-500" x-text="doc.title || 'IntelliDoc File'"></p>
+            </div>
         </div>
         <div class="flex items-center gap-3">
-            <button id="favoriteBtn" class="btn btn-outline btn-sm hover:bg-gray-700" title="Toggle Favorite">
-                <i class="fas fa-star"></i>
+            <span x-show="doc.processing_status === 'completed'" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-100 text-emerald-800">
+                <i class="fas fa-check-circle"></i> Analyzed
+            </span>
+            <button @click="downloadDoc()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                <i class="fas fa-download mr-1"></i> Download
             </button>
-            <button id="shareBtn" class="btn btn-outline btn-sm hover:bg-gray-700">
-                <i class="fas fa-share-alt"></i> Share
+            <button @click="shareModal = true" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                <i class="fas fa-share-alt mr-1"></i> Share
             </button>
-            <button id="downloadBtn" class="btn btn-outline btn-sm hover:bg-gray-700">
-                <i class="fas fa-download"></i> Download
-            </button>
-            <button id="deleteBtn" class="btn btn-outline btn-sm hover:bg-gray-700 text-red-400">
-                <i class="fas fa-trash-alt"></i> Delete
-            </button>
-            <a href="/documents/view" class="btn btn-sm bg-gray-700 hover:bg-gray-600">
-                <i class="fas fa-arrow-left"></i> Back to Documents
-            </a>
         </div>
     </div>
-</div>
 
-<!-- Alert Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        <div class="mb-4">
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} fade-in fade-in-delay-2">
-                    <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'error' %}fa-times-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %} alert-icon"></i>
-                    <div class="alert-message">{{ message }}</div>
+    <!-- 2 Column Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Column: Document Preview (Simulated via iframe for PDFs or placeholder) -->
+        <div class="flex-1 bg-gray-100 overflow-hidden relative flex flex-col">
+            <template x-if="doc.content_type && doc.content_type.includes('pdf') && doc.signed_url">
+                <iframe :src="doc.signed_url" class="w-full h-full border-0"></iframe>
+            </template>
+            <template x-if="!(doc.content_type && doc.content_type.includes('pdf')) || !doc.signed_url">
+                <div class="m-auto text-center">
+                    <div class="w-24 h-24 mx-auto mb-4 rounded-xl flex items-center justify-center text-5xl bg-white shadow-sm" :class="getFileIconColor(doc.filename)">
+                        <i :class="getFileIcon(doc.filename)"></i>
+                    </div>
+                    <p class="text-gray-500 font-medium mb-4">Preview not available for this file type.</p>
+                    <a x-show="doc.signed_url" :href="doc.signed_url" target="_blank" class="text-primary hover:underline text-sm font-medium">Download to view</a>
                 </div>
-            {% endfor %}
+            </template>
         </div>
-    {% endif %}
-{% endwith %}
 
-<!-- Document Viewer -->
-<div class="grid grid-2 gap-6">
-    <!-- Document Preview -->
-    <div class="card card-3d fade-in fade-in-delay-3">
-        <div class="card-header">
-            <h2><i class="fas fa-file-alt holographic"></i> Document Preview</h2>
-        </div>
-        <div class="card-body">
-            <div id="documentPreview" class="document-preview-container">
-                <!-- Preview content will be loaded here -->
-                <div class="loading-preview">
-                    <div class="flex items-center justify-center gap-4 py-12">
-                        <div class="animate-spin rounded-full border-4 border-t-white border-gray-700 w-10 h-10"></div>
-                        <p class="text-gray-400">Loading document preview...</p>
+        <!-- Right Column: Metadata Inspector -->
+        <div class="w-80 md:w-96 bg-white border-l border-gray-200 overflow-y-auto shrink-0 flex flex-col">
+            
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-200 px-2 shrink-0">
+                <button @click="activeTab = 'details'" :class="activeTab === 'details' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'" class="flex-1 py-3 border-b-2 font-medium text-sm transition-colors">Details</button>
+                <button @click="activeTab = 'intelligence'" :class="activeTab === 'intelligence' ? 'border-amber-500 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="flex-1 py-3 border-b-2 font-medium text-sm transition-colors"><i class="fas fa-sparkles mr-1 text-amber-400"></i> AI Insights</button>
+            </div>
+
+            <!-- Details Tab -->
+            <div x-show="activeTab === 'details'" class="p-6 space-y-6">
+                <div>
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">System Properties</h4>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">File Size</span>
+                            <span class="font-medium text-gray-900" x-text="formatSize(doc.file_size)"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Type</span>
+                            <span class="font-medium text-gray-900" x-text="doc.document_type || 'Unknown'"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Uploaded</span>
+                            <span class="font-medium text-gray-900" x-text="formatDate(doc.CreatedAt)"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Owner</span>
+                            <span class="font-medium text-gray-900" x-text="doc.owner_id === userData?.uid ? 'Me' : doc.owner_id"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-6">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Security</h4>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-500">Access Level</span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                <i class="fas fa-lock"></i> Private
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center" x-show="doc.sensitivity_level">
+                            <span class="text-gray-500">Sensitivity</span>
+                            <span class="font-medium text-gray-900 capitalize" x-text="doc.sensitivity_level"></span>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Intelligence Tab -->
+            <div x-show="activeTab === 'intelligence'" class="p-6 flex-1 flex flex-col" style="display: none;">
+                
+                <div x-show="doc.processing_status === 'pending' || doc.processing_status === 'extracting'" class="text-center py-8">
+                    <i class="fas fa-microchip fa-spin text-amber-500 text-3xl mb-4"></i>
+                    <h3 class="text-gray-900 font-medium">Analyzing Document</h3>
+                    <p class="text-sm text-gray-500 mt-2">Our AI is currently reading and extracting insights from this document.</p>
+                </div>
+
+                <div x-show="doc.processing_status === 'completed'" class="space-y-6">
+                    
+                    <div x-show="doc.title" class="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                        <h4 class="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            <i class="fas fa-lightbulb text-amber-500"></i> Suggested Title
+                        </h4>
+                        <p class="text-sm font-medium text-amber-900" x-text="doc.title"></p>
+                    </div>
+
+                    <div x-show="doc.detected_language || doc.classification_confidence">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">AI Classifications</h4>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between" x-show="doc.detected_language">
+                                <span class="text-gray-500">Language</span>
+                                <span class="font-medium text-gray-900 uppercase" x-text="doc.detected_language"></span>
+                            </div>
+                            <div class="flex justify-between" x-show="doc.classification_confidence">
+                                <span class="text-gray-500">Confidence</span>
+                                <span class="font-medium text-gray-900" x-text="(doc.classification_confidence * 100).toFixed(1) + '%'"></span>
+                            </div>
+                            <div class="flex justify-between" x-show="doc.deadline_date">
+                                <span class="text-gray-500">Deadline</span>
+                                <span class="font-medium text-red-600" x-text="formatDate(doc.deadline_date)"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="doc.entities && doc.entities.length > 0">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Extracted Entities</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="entity in doc.entities">
+                                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200" x-text="entity"></span>
+                            </template>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Document Info and Actions -->
-    <div class="card card-3d fade-in fade-in-delay-4">
-        <div class="card-header">
-            <h2><i class="fas fa-info-circle holographic"></i> Document Information</h2>
-        </div>
-        <div class="card-body">
-            <div id="documentInfo">
-                <!-- Document info will be loaded here -->
-                <div class="text-center py-8">
-                    <i class="fas fa-spinner fa-spin text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">Loading document information...</p>
-                </div>
+    <!-- Share Modal -->
+    <div x-show="shareModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm" style="display: none;" x-transition>
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" @click.away="shareModal = false">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-900">Share Document</h3>
+                <button @click="shareModal = false" class="text-gray-400 hover:text-gray-500"><i class="fas fa-times"></i></button>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Intelligence Insights -->
-<div class="card mt-6 card-3d fade-in fade-in-delay-5">
-    <div class="card-header">
-        <h2><i class="fas fa-brain holographic"></i> Intelligence Insights</h2>
-    </div>
-    <div class="card-body">
-        <div class="tab-container">
-            <div class="tabs">
-                <button class="tab active" data-tab="actions">Actions & Tasks</button>
-                <button class="tab" data-tab="relationships">Relationships</button>
-                <button class="tab" data-tab="classification">Classification</button>
-                <button class="tab" data-tab="versions">Versions</button>
-            </div>
-            <div class="tab-content active" id="actionsTab">
-                <!-- Actions will be loaded here -->
-                <div class="text-center py-6">
-                    <i class="fas fa-tasks text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">Loading actions...</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input type="email" x-model="shareEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" placeholder="colleague@company.com">
                 </div>
-            </div>
-            <div class="tab-content" id="relationshipsTab">
-                <!-- Relationships will be loaded here -->
-                <div class="text-center py-6">
-                    <i class="fas fa-project-diagram text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">Loading relationships...</p>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Access Level</label>
+                    <select x-model="shareRole" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                        <option value="viewer">Viewer</option>
+                        <option value="commenter">Commenter</option>
+                        <option value="editor">Editor</option>
+                    </select>
                 </div>
-            </div>
-            <div class="tab-content" id="classificationTab">
-                <!-- Classification will be loaded here -->
-                <div class="text-center py-6">
-                    <i class="fas fa-tags text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">Loading classification...</p>
-                </div>
-            </div>
-            <div class="tab-content" id="versionsTab">
-                <!-- Versions will be loaded here -->
-                <div class="text-center py-6">
-                    <i class="fas fa-code-branch text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">Loading versions...</p>
-                </div>
+                <button @click="executeShare()" :disabled="sharing" class="w-full bg-primary hover:bg-primary-hover text-white py-2 rounded-lg font-medium transition-colors">
+                    <span x-text="sharing ? 'Sharing...' : 'Share Document'"></span>
+                </button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get document ID from URL
-        const docId = window.location.pathname.split('/').pop();
-        if (!docId || docId === 'view') {
-            window.location.href = '/documents/view';
-            return;
-        }
+document.addEventListener('alpine:init', () => {
+    Alpine.data('documentViewer', (docId) => ({
+        doc: {},
+        docId: docId,
+        activeTab: 'details',
+        loading: true,
+        
+        // Share state
+        shareModal: false,
+        shareEmail: '',
+        shareRole: 'viewer',
+        sharing: false,
 
-        // Load document data
-        loadDocumentData(docId);
-        setupEventListeners();
-        setupTabSwitching();
-    });
-
-    function setupEventListeners() {
-        const favoriteBtn = document.getElementById('favoriteBtn');
-        const shareBtn = document.getElementById('shareBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const deleteBtn = document.getElementById('deleteBtn');
-
-        if (favoriteBtn) {
-            favoriteBtn.addEventListener('click', function() {
-                toggleFavorite();
-            });
-        }
-
-        if (shareBtn) {
-            shareBtn.addEventListener('click', function() {
-                shareDocument();
-            });
-        }
-
-        if (downloadBtn) {
-            downloadBtn.addEventListener('click', function() {
-                downloadDocument();
-            });
-        }
-
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', function() {
-                if (confirm('Are you sure you want to delete this document?')) {
-                    deleteDocument();
+        async initData() {
+            try {
+                const res = await window.authenticatedFetch(`/documents/${this.docId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.doc = data.document;
+                    
+                    // Automatically get signed URL for preview/download
+                    const urlRes = await window.authenticatedFetch(`/documents/${this.docId}/download`);
+                    if (urlRes.ok) {
+                        const urlData = await urlRes.json();
+                        this.doc.signed_url = urlData.download_url;
+                    }
                 }
-            });
-        }
-    }
-
-    function setupTabSwitching() {
-        const tabs = document.querySelectorAll('.tab');
-        const tabContents = document.querySelectorAll('.tab-content');
-
-        tabs.forEach(tab => {
-            tab.addEventListener('click', function() {
-                const tabName = this.getAttribute('data-tab');
-
-                // Deactivate all tabs
-                tabs.forEach(t => t.classList.remove('active'));
-                tabContents.forEach(c => c.classList.remove('active'));
-
-                // Activate current tab
-                this.classList.add('active');
-                document.getElementById(`${tabName}Tab`).classList.add('active');
-            });
-        });
-    }
-
-    async function loadDocumentData(docId) {
-        try {
-            // Load document info
-            const docResponse = await authenticatedFetch(`/documents/${docId}`);
-            if (!docResponse.ok) {
-                throw new Error('Failed to load document');
+            } catch (e) {
+                console.error(e);
+                window.showToast("Failed to load document.", "error");
             }
-            const docData = await docResponse.json();
+        },
 
-            // Load intelligence data
-            const intelResponse = await authenticatedFetch(`/intelligence/document/${docId}/data`);
-            const intelData = intelResponse.ok ? await intelResponse.json() : {};
-
-            // Update UI
-            updateDocumentHeader(docData);
-            updateDocumentPreview(docData);
-            updateDocumentInfo(docData);
-            updateActionsTab(intelData.actions || []);
-            updateRelationshipsTab(intelData.relationships || []);
-            updateClassificationTab(intelData.classification || {});
-            updateVersionsTab(intelData.versions || []);
-
-        } catch (error) {
-            console.error('Error loading document data:', error);
-            showErrorState('Failed to load document data. Please try again.');
-        }
-    }
-
-    function updateDocumentHeader(docData) {
-        // Update page title and header
-        document.title = `${docData.filename} - IntelliDoc`;
-        const headerTitle = document.querySelector('.page-header h1');
-        if (headerTitle) {
-            headerTitle.innerHTML = `<i class="fas fa-eye holographic"></i> ${docData.filename}`;
-        }
-
-        // Update favorite button state
-        const favoriteBtn = document.getElementById('favoriteBtn');
-        if (favoriteBtn) {
-            const icon = favoriteBtn.querySelector('i');
-            if (docData.is_favorite) {
-                icon.classList.remove('text-gray-400');
-                icon.classList.add('text-yellow-300');
+        downloadDoc() {
+            if (this.doc.signed_url) {
+                window.open(this.doc.signed_url, '_blank');
             } else {
-                icon.classList.remove('text-yellow-300');
-                icon.classList.add('text-gray-400');
+                window.showToast("Download URL not available.", "error");
             }
-        }
-    }
+        },
 
-    function updateDocumentPreview(docData) {
-        const previewContainer = document.getElementById('documentPreview');
-        if (!previewContainer) return;
-
-        // Determine file type and show appropriate preview
-        const contentType = docData.content_type || '';
-        const filename = docData.filename || '';
-        const lowerFilename = filename.toLowerCase();
-
-        let previewHTML = '';
-
-        if (contentType.startsWith('image/') ||
-            lowerFilename.endsWith('.jpg') ||
-            lowerFilename.endsWith('.jpeg') ||
-            lowerFilename.endsWith('.png') ||
-            lowerFilename.endsWith('.gif') ||
-            lowerFilename.endsWith('.bmp') ||
-            lowerFilename.endsWith('.webp')) {
-            // Image preview with 3D effect
-            previewHTML = `
-                <div class="image-preview-wrapper">
-                    <div class="image-preview-3d">
-                        <img src="${docData.storage_path || '#'}" alt="${filename}" class="image-preview" onerror="this.onerror=null; this.src='/static/img/image-placeholder.svg';">
-                    </div>
-                </div>
-            `;
-        } else if (contentType === 'application/pdf' || lowerFilename.endsWith('.pdf')) {
-            // PDF preview
-            previewHTML = `
-                <div class="pdf-preview-wrapper">
-                    <div class="pdf-preview">
-                        <iframe src="${docData.storage_path || '#'}#toolbar=0&navpanes=0&scrollbar=0"
-                                class="pdf-frame"
-                                onerror="this.onerror=null; this.parentNode.innerHTML = '<div class=\\\"text-center py-8\\\"><i class=\\\"fas fa-file-pdf fa-4x text-gray-400 mb-3\\\"></i><p class=\\\"text-gray-400\\\">PDF preview not available</p></div>';">
-                        </iframe>
-                    </div>
-                    <div class="pdf-controls mt-3 flex justify-center items-center gap-3">
-                        <button class="btn btn-sm btn-outline" id="zoomInBtn"><i class="fas fa-search-plus"></i></button>
-                        <button class="btn btn-sm btn-outline" id="zoomOutBtn"><i class="fas fa-search-minus"></i></button>
-                        <button class="btn btn-sm btn-outline" id="downloadPdfBtn"><i class="fas fa-download"></i></button>
-                    </div>
-                </div>
-            `;
-        } else if (contentType.startsWith('text/') ||
-                   lowerFilename.endsWith('.txt') ||
-                   lowerFilename.endsWith('.md') ||
-                   lowerFilename.endsWith('.json') ||
-                   lowerFilename.endsWith('.xml') ||
-                   lowerFilename.endsWith('.html') ||
-                   lowerFilename.endsWith('.css') ||
-                   lowerFilename.endsWith('.js')) {
-            // Text preview
-            previewHTML = `
-                <div class="text-preview-wrapper">
-                    <div class="text-preview-header flex justify-between items-start mb-3">
-                        <div>
-                            <h3 class="font-semibold text-white">${filename}</h3>
-                            <p class="text-sm text-gray-400">${formatFileSize(docData.size || 0)} • ${contentType}</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button class="btn btn-sm btn-outline" id="downloadTextBtn"><i class="fas fa-download"></i></button>
-                            <button class="btn btn-sm btn-outline" id="copyTextBtn"><i class="fas fa-copy"></i></button>
-                        </div>
-                    </div>
-                    <div class="text-preview-content" id="textContent">
-                        <div class="text-loading">
-                            <div class="flex items-center justify-center py-6">
-                                <div class="animate-spin rounded-full border-2 border-t-white border-gray-700 w-8 h-8 mr-2"></div>
-                                <span class="text-gray-400">Loading text content...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else {
-            // Generic file preview
-            previewHTML = `
-                <div class="file-preview-wrapper text-center py-12">
-                    <div class="file-icon">
-                        <i class="${getFileIcon(contentType)} fa-4x text-gray-400 mb-4"></i>
-                    </div>
-                    <h3 class="font-semibold text-white mb-2">${filename}</h3>
-                    <p class="text-gray-400 mb-4">${formatFileSize(docData.size || 0)} • ${contentType}</p>
-                    <div class="flex justify-center gap-3">
-                        <button class="btn btn-sm btn-outline" id="downloadFileBtn"><i class="fas fa-download"></i> Download</button>
-                        <button class="btn btn-sm btn-outline" id="openFileBtn"><i class="fas fa-external-link-alt"></i> Open</button>
-                    </div>
-                </div>
-            `;
-        }
-
-        previewContainer.innerHTML = previewHTML;
-
-        // Initialize specific preview functionality
-        if (contentType.startsWith('text/') ||
-            lowerFilename.endsWith('.txt') ||
-            lowerFilename.endsWith('.md') ||
-            lowerFilename.endsWith('.json') ||
-            lowerFilename.endsWith('.xml') ||
-            lowerFilename.endsWith('.html') ||
-            lowerFilename.endsWith('.css') ||
-            lowerFilename.endsWith('.js')) {
-            loadTextContent(docData);
-        }
-    }
-
-    function loadTextContent(docData) {
-        // In a real app, we would fetch the actual text content from storage
-        // For demo, we'll simulate with placeholder text
-        const textContentDiv = document.getElementById('textContent');
-        if (!textContentDiv) return;
-
-        // Simulate loading
-        setTimeout(() => {
-            const sampleText = `This is a sample text content for ${docData.filename}.
-
-In a real implementation, this would show the actual extracted text from the document.
-The intelligence system would have processed this document to extract:
-- Key entities and concepts
-- Action items and deadlines
-- Classification and categorization
-- Relationships to other documents
-- Embeddings for semantic search
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`;
-
-            textContentDiv.innerHTML = `<pre class="whitespace-pre-wrap break-words text-gray-300">${sampleText}</pre>`;
-
-            // Add functionality to buttons
-            const downloadTextBtn = document.getElementById('downloadTextBtn');
-            const copyTextBtn = document.getElementById('copyTextBtn');
-            if (downloadTextBtn) {
-                downloadTextBtn.addEventListener('click', function() {
-                    // In real app: trigger download
-                    alert('Text download functionality would trigger here');
+        async executeShare() {
+            if (!this.shareEmail) return;
+            this.sharing = true;
+            try {
+                const res = await window.authenticatedFetch(`/documents/${this.docId}/share`, {
+                    method: 'POST',
+                    body: JSON.stringify({ email: this.shareEmail, role: this.shareRole })
                 });
+                
+                if (res.ok) {
+                    window.showToast("Document shared successfully", "success");
+                    this.shareModal = false;
+                    this.shareEmail = '';
+                } else {
+                    const err = await res.json();
+                    window.showToast(err.error || "Failed to share document", "error");
+                }
+            } catch (e) {
+                window.showToast("Error sharing document", "error");
+            } finally {
+                this.sharing = false;
             }
-            if (copyTextBtn) {
-                copyTextBtn.addEventListener('click', function() {
-                    navigator.clipboard.writeText(sampleText).then(() => {
-                        alert('Text copied to clipboard!');
-                    });
-                });
-            }
-        }, 500);
-    }
+        },
 
-    function updateDocumentInfo(docData) {
-        const infoContainer = document.getElementById('documentInfo');
-        if (!infoContainer) return;
-
-        const infoHTML = `
-            <div class="space-y-4">
-                <div class="flex justify-between items-start">
-                    <span class="text-gray-400 font-medium">Filename:</span>
-                    <span class="text-white">${docData.filename || 'Unknown'}</span>
-                </div>
-                <div class="flex justify-between items-start">
-                    <span class="text-gray-400 font-medium">File Size:</span>
-                    <span class="text-white">${formatFileSize(docData.size || 0)}</span>
-                </div>
-                <div class="flex justify-between items-start">
-                    <span class="text-gray-400 font-medium">Content Type:</span>
-                    <span class="text-white">${docData.content_type || 'Unknown'}</span>
-                </div>
-                <div class="flex justify-between items-start">
-                    <span class="text-gray-400 font-medium">Upload Date:</span>
-                    <span class="text-white">${formatDate(docData.CreatedAt || docData.createdAt)}</span>
-                </div>
-                <div class="flex justify-between items-start">
-                    <span class="text-gray-400 font-medium">Last Modified:</span>
-                    <span class="text-white">${formatDate(docData.UpdatedAt || docData.updatedAt)}</span>
-                </div>
-                <div class="flex justify-between items-start">
-                    <span class="text-gray-400 font-medium">Document ID:</span>
-                    <span class="text-neutral-400 font-mono text-xs">${docData.doc_id || 'N/A'}</span>
-                </div>
-                <div class="flex justify-between items-start mt-4">
-                    <span class="text-gray-400 font-medium">Owner:</span>
-                    <span class="text-white">${docData.owner_name || 'Unknown'}</span>
-                </div>
-            </div>
-
-            <div class="mt-6 pt-4 border-t border-gray-700">
-                <h3 class="font-semibold text-white mb-3">Processing Status</h3>
-                <div class="space-y-2">
-                    <div class="flex justify-between items-start">
-                        <span class="text-gray-400">Text Extraction:</span>
-                        <span class="px-2 py-0.5 rounded-full text-xs ${getStatusClass(docData.extraction_status)}">${docData.extraction_status || 'pending'}</span>
-                    </div>
-                    <div class="flex justify-between items-start>
-                        <span class="text-gray-400">Intelligence Processing:</span>
-                        <span class="px-2 py-0.5 rounded-full text-xs ${getStatusClass(docData.intelligence_status)}">${docData.intelligence_status || 'pending'}</span>
-                    </div>
-                    <div class="flex justify-between items-start>
-                        <span class="text-gray-400">Processing Progress:</span>
-                        <div class="w-full bg-gray-700 rounded-full overflow-hidden">
-                            <div class="h-full bg-indigo-500 rounded-full" style="width: ${docData.processing_progress || 0}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        infoContainer.innerHTML = infoHTML;
-    }
-
-    function updateActionsTab(actions) {
-        const container = document.getElementById('actionsTab');
-        if (!container) return;
-
-        if (actions.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-6">
-                    <i class="fas fa-tasks text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">No action items found in this document</p>
-                </div>
-            `;
-            return;
+        formatSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
+        
+        formatDate(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+        
+        getFileIcon(name) {
+            name = (name || '').toLowerCase();
+            if (name.endsWith('.pdf')) return 'fas fa-file-pdf';
+            if (name.endsWith('.doc') || name.endsWith('.docx')) return 'fas fa-file-word';
+            if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'fas fa-file-excel';
+            if (name.endsWith('.jpg') || name.endsWith('.png')) return 'fas fa-file-image';
+            if (name.endsWith('.ppt') || name.endsWith('.pptx')) return 'fas fa-file-powerpoint';
+            return 'fas fa-file-alt';
+        },
+        
+        getFileIconColor(name) {
+            name = (name || '').toLowerCase();
+            if (name.endsWith('.pdf')) return 'bg-red-50 text-red-500';
+            if (name.endsWith('.doc') || name.endsWith('.docx')) return 'bg-blue-50 text-blue-500';
+            if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'bg-emerald-50 text-emerald-500';
+            if (name.endsWith('.jpg') || name.endsWith('.png')) return 'bg-purple-50 text-purple-500';
+            if (name.endsWith('.ppt') || name.endsWith('.pptx')) return 'bg-orange-50 text-orange-500';
+            return 'bg-gray-100 text-gray-500';
         }
-
-        const actionsHTML = actions.map(action => `
-            <div class="mb-4 p-3 bg-gray-800 rounded-lg border-l-4 border-indigo-500">
-                <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-semibold text-white">${action.action_text || action.action || 'No description'}</h4>
-                    <span class="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-800">${action.action_type || 'task'}</span>
-                </div>
-                ${action.deadline ? `
-                    <div class="flex justify-between items-start mb-2 text-sm">
-                        <span class="text-gray-400">Deadline:</span>
-                        <span class="text-white">${formatDate(action.deadline)}</span>
-                    </div>
-                ` : ''}
-                ${action.confidence !== undefined ? `
-                    <div class="flex justify-between items-start text-sm">
-                        <span class="text-gray-400">Confidence:</span>
-                        <span class="text-white">${(action.confidence * 100).toFixed(1)}%</span>
-                    </div>
-                ` : ''}
-                ${action.created_at ? `
-                    <div class="text-xs text-gray-500 mt-1">
-                        <i class="fas fa-calendar mr-1"></i> Created: ${formatDate(action.created_at)}
-                    </div>
-                ` : ''}
-            </div>
-        `).join('');
-
-        container.innerHTML = actionsHTML;
-    }
-
-    function updateRelationshipsTab(relationships) {
-        const container = document.getElementById('relationshipsTab');
-        if (!container) return;
-
-        if (relationships.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-6">
-                    <i class="fas fa-project-diagram text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">No relationships found for this document</p>
-                </div>
-            `;
-            return;
-        }
-
-        const relsHTML = relationships.map(rel => `
-            <div class="mb-4 p-3 bg-gray-800 rounded-lg border-l-4 border-green-500">
-                <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-semibold text-white">${rel.target_document_id ? `Related Document` : 'Unknown Relationship'}</h4>
-                    <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">${rel.relationship_type || 'related'}</span>
-                </div>
-                <div class="flex justify-between items-start mb-2 text-sm">
-                    <span class="text-gray-400">Confidence:</span>
-                    <span class="text-white">${(rel.confidence || 0) * 100}%</span>
-                </div>
-                <div class="flex justify-between items-start mb-2 text-sm">
-                    <span class="text-gray-400">Reason:</span>
-                    <span class="text-white">${rel.reason || 'No reason provided'}</span>
-                </div>
-            </div>
-        `).join('');
-
-        container.innerHTML = relsHTML;
-    }
-
-    function updateClassificationTab(classification) {
-        const container = document.getElementById('classificationTab');
-        if (!container) return;
-
-        if (!classification || Object.keys(classification).length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-6>
-                    <i class="fas fa-tags text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">No classification data available</p>
-                </div>
-            `;
-            return;
-        }
-
-        const classHTML = `
-            <div class="space-y-4">
-                <div class="flex justify-between items-start>
-                    <span class="text-gray-400 font-medium">Category:</span>
-                    <span class="text-white font-semibold">${classification.category || 'Unknown'}</span>
-                </div>
-                <div class="flex justify-between items-start>
-                    <span class="text-gray-400 font-medium">Confidence:</span>
-                    <span class="text-white">${(classification.confidence || 0) * 100}%</span>
-                </div>
-                ${classification.keywords_matched ? `
-                    <div class="flex justify-between items-start mt-2>
-                        <span class="text-gray-400 font-medium">Keywords Matched:</span>
-                        <span class="text-white">${classification.keywords_matched.join(', ')}</span>
-                    </div>
-                ` : ''}
-            </div>
-
-            <div class="mt-6 pt-4 border-t border-gray-700>
-                <h3 class="font-semibold text-white mb-3">All Categories</h3>
-                <div class="space-y-2>
-                    ${Object.entries(classification.all_scores || {}).map(([category, score]) => `
-                        <div class="flex justify-between items-start>
-                            <span class="text-gray-400>${category}:</span>
-                            <span class="text-white">${(score * 100).toFixed(1)}%</span>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-        container.innerHTML = classHTML;
-    }
-
-    function updateVersionsTab(versions) {
-        const container = document.getElementById('versionsTab');
-        if (!container) return;
-
-        if (versions.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-6>
-                    <i class="fas fa-code-branch text-xl text-gray-400 mb-3"></i>
-                    <p class="text-gray-400">No version history found for this document</p>
-                </div>
-            `;
-            return;
-        }
-
-        const versionsHTML = versions.map((version, index) => `
-            <div class="mb-4 p-3 bg-gray-800 rounded-lg border-l-4 border-purple-500>
-                <div class="flex justify-between items-start mb-2>
-                    <h4 class="font-semibold text-white">Version ${index + 1}</h4>
-                    <span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800">${version.version_type || 'version'}</span>
-                </div>
-                <div class="flex justify-between items-start mb-2 text-sm>
-                    <span class="text-gray-400>Similarity:</span>
-                    <span class="text-white>${(version.similarity || 0) * 100}%</span>
-                </div>
-                <div class="flex justify-between items-start mb-2 text-sm>
-                    <span class="text-gray-400>Date:</span>
-                    <span class="text-white">${formatDate(version.date || version.createdAt)}</span>
-                </div>
-                ${version.changes_summary ? `
-                    <div class="mt-2 text-sm text-gray-400>
-                        <strong>Changes:</strong> ${version.changes_summary}
-                    </div>
-                ` : ''}
-            </div>
-        `).join('');
-
-        container.innerHTML = versionsHTML;
-    }
-
-    function shareDocument() {
-        alert('Share functionality would open a sharing dialog here');
-    }
-
-    function downloadDocument() {
-        alert('Download functionality would initiate file download here');
-    }
-
-    function deleteDocument() {
-        // In real app: make DELETE request
-        alert('Document deleted successfully');
-        window.location.href = '/documents/view';
-    }
-
-    // Utility functions
-    function getFileIcon(contentType) {
-        if (!contentType) return 'fas fa-file';
-
-        const lower = contentType.toLowerCase();
-
-        if (lower.includes('pdf')) return 'fas fa-file-pdf';
-        if (lower.includes('msword') || lower.includes('word')) return 'fas fa-file-word';
-        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'fas fa-file-excel';
-        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'fas fa-file-powerpoint';
-        if (lower.includes('image')) return 'fas fa-file-image';
-        if (lower.includes('text')) return 'fas fa-file-alt';
-        if (lower.includes('json')) return 'fas fa-file-code';
-        if (lower.includes('zip') || lower.includes('archive')) return 'fas fa-file-archive';
-
-        return 'fas fa-file';
-    }
-
-    function getStatusClass(status) {
-        if (!status) return 'bg-gray-700';
-
-        const lower = status.toLowerCase();
-
-        if (lower.includes('completed') || lower.includes('success')) return 'bg-green-600 text-white';
-        if (lower.includes('processing') || lower.includes('pending')) return 'bg-yellow-600 text-white';
-        if (lower.includes('failed') || lower.includes('error')) return 'bg-red-600 text-white';
-
-        return 'bg-gray-700';
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        const options = { year: 'numeric', month: 'short', day: 'numeric' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
-    }
-
-    function toggleFavorite() {
-        const docId = window.location.pathname.split('/').pop();
-        const favoriteBtn = document.getElementById('favoriteBtn');
-        const isCurrentlyFavorite = favoriteBtn.querySelector('i').classList.contains('text-yellow-300');
-
-        showLoading();
-
-        authenticatedFetch(`/documents/${docId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ is_favorite: !isCurrentlyFavorite })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to update favorite status');
-            }
-            return response.json();
-        })
-        .then(data => {
-            hideLoading();
-            // Update UI
-            const icon = favoriteBtn.querySelector('i');
-            if (!isCurrentlyFavorite) {
-                icon.classList.remove('text-gray-400');
-                icon.classList.add('text-yellow-300');
-            } else {
-                icon.classList.remove('text-yellow-300');
-                icon.classList.add('text-gray-400');
-            }
-            showSuccessMessage(isCurrentlyFavorite ? 'Removed from favorites' : 'Added to favorites');
-        })
-        .catch(error => {
-            console.error('Error toggling favorite:', error);
-            hideLoading();
-            showErrorState('Failed to update favorite status. Please try again.');
-        });
-    }
-
-    function showErrorState(message) {
-        // Show error in main content area
-        const mainContent = document.querySelector('.container');
-        if (mainContent) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'alert alert-error fade-in';
-            errorDiv.innerHTML = `
-                <i class="fas fa-exclamation-triangle alert-icon"></i>
-                <div class="alert-message">${message || 'An error occurred'}</div>
-            `;
-            mainContent.insertBefore(errorDiv, mainContent.firstChild);
-
-            // Remove after 3 seconds
-            setTimeout(() => {
-                errorDiv.remove();
-            }, 3000);
-        }
-    }
+    }));
+});
 </script>
 {% endblock %}

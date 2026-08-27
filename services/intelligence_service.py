@@ -70,9 +70,6 @@ class IntelligenceService:
             logger.info(f"Text extraction successful for document {document.doc_id}")
             # Store the extracted text for later use (with timestamp for potential TTL)
             self._store_extracted_text(document.doc_id, extracted_text)
-        else:
-            # Store the extracted text for later use (with timestamp for potential TTL)
-            self._store_extracted_text(document.doc_id, extracted_text)
 
             # Step 2.5: Generate LLM-based summary and key points
             logger.info(f"Generating LLM-based summary and key points for document {document.doc_id}")
@@ -93,8 +90,7 @@ class IntelligenceService:
             except Exception as e:
                 logger.warning(f"LLM processing failed for document {document.doc_id}: {e}")
                 # Continue with processing even if LLM fails
-
-        # Step 2: Generate embedding
+        else:
             document.extraction_status = "failed"
             logger.warning(f"Text extraction failed for document {document.doc_id}")
             document.intelligence_status = "failed"
@@ -106,7 +102,7 @@ class IntelligenceService:
         document.intelligence_status = "processing"
         embedding = self.embedding_service.generate_embedding(extracted_text)
         if embedding is not None:
-            document.embedding = embedding.tolist()  # Convert numpy array to list for Firestore
+            document.embedding = embedding  # Already a list
             document.intelligence_status = "completed"
             logger.info(f"Embedding generated for document {document.doc_id}")
         else:
@@ -123,10 +119,42 @@ class IntelligenceService:
 
         # Step 4: Classify the document
         category, confidence = self.classification_service.classify(document, extracted_text)
-        # We'll store the classification in the document itself (we could add a field, but for now we'll store in a separate collection or in the document)
-        # We'll add a classification field to the document? We'll store it in a separate collection for simplicity.
-        # We'll create a classification collection later. For now, we'll just log it.
+        document.document_type = category
+        document.classification_confidence = confidence
         logger.info(f"Document {document.doc_id} classified as {category} with confidence {confidence}")
+
+        # Step 4.5: Extract entities and generate AI suggestions
+        try:
+            from services.entity_extraction_service import EntityExtractionService
+            entity_extractor = EntityExtractionService()
+            entities_dict = entity_extractor.extract_entities(extracted_text)
+            
+            # Save raw entities list
+            all_entities = []
+            for k, v in entities_dict.items():
+                if v:
+                    all_entities.extend(v)
+            document.entities = list(set(all_entities))[:15] # keep top 15
+
+            # Set a suggested title if none exists
+            if document.filename:
+                import os
+                base_name = os.path.splitext(document.filename)[0]
+                document.suggested_title = f"{category.capitalize()} - {base_name}"
+            
+            document.suggested_tags = [category] + entities_dict.get('organizations', [])[:3]
+            document.suggestions_status = 'pending'
+            
+        except Exception as e:
+            logger.warning(f"Entity extraction failed for document {document.doc_id}: {e}")
+
+        # Step 4.6: Classify sensitivity level
+        try:
+            sensitivity = self.classification_service.classify_sensitivity(extracted_text)
+            document.sensitivity_level = sensitivity
+            logger.info(f"Document {document.doc_id} sensitivity: {sensitivity}")
+        except Exception as e:
+            logger.warning(f"Sensitivity classification failed for document {document.doc_id}: {e}")
 
         # Step 5: Check for duplicates and versions (requires comparing with existing documents)
         # We'll fetch existing documents for the same owner (to limit scope)
@@ -152,6 +180,7 @@ class IntelligenceService:
             logger.info(f"Found {len(relationships)} potential relationships for document {document.doc_id}")
             self._store_relationships(document.doc_id, relationships, relationship_type='related')
 
+        document.processing_status = 'completed'
         # Update the document in Firestore (to save embedding and intelligence status)
         self._save_document(document)
 
@@ -385,6 +414,7 @@ class IntelligenceService:
         except Exception as e:
             logger.error(f"Error summarizing document {document_id}: {e}")
             return "Unable to generate summary due to an error."
+    def extract_key_points(self, document_id: str, num_points: int = 5) -> List[str]:
         """
         Extract key bullet points from the document using the LLM service.
         Returns a list of strings (each string is a bullet point).
@@ -414,7 +444,8 @@ class IntelligenceService:
                 except Exception as e:
                     logger.warning(f"LLM key point extraction failed, falling back to empty: {e}")
             
-            # Fallback to empty list (we could implement extractive key point extraction here,             # but for simplicity we'll return empty if LLM is not available)
+            # Fallback to empty list (we could implement extractive key point extraction here,
+            # but for simplicity we'll return empty if LLM is not available)
             return []
         except Exception as e:
             logger.error(f"Error extracting key points from document {document_id}: {e}")

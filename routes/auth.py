@@ -5,6 +5,7 @@ from services.user_service import UserService
 from services.audit_service import audit_service
 from utils.validation import validate_email, validate_password, ValidationError, sanitize_input
 from models.user import User
+from models.audit_log import AuditLog
 from functools import wraps
 
 logger = logging.getLogger(__name__)
@@ -168,6 +169,8 @@ def register():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 400
+
+@auth_bp.route('/verify-token', methods=['POST'])
 def verify_token():
     """
     Verify Firebase ID token and return user data.

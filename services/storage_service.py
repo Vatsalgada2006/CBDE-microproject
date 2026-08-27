@@ -31,7 +31,7 @@ class StorageService:
         # Make the blob publicly accessible (if needed) or generate a signed URL
         # For simplicity, we'll generate a signed URL that expires in 1 hour.
         # In production, you might want to set proper security rules.
-        url = blob.generate_signed_request("GET", expiration=3600)
+        url = blob.generate_signed_url(expiration=3600, method="GET")
         return url, blob_path
 
     def delete_file(self, blob_path):

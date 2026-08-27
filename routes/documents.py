@@ -1,10 +1,13 @@
 import logging
-from flask import Blueprint, request, jsonify, send_file, render_template
+from flask import Blueprint, request, jsonify, send_file, render_template, current_app
 from services.firebase_service import auth
 from services.document_service import DocumentService
 from services.storage_service import StorageService
 from services.share_service import ShareService
 from models.document import Document
+from models.audit_log import AuditLog
+from services.audit_service import audit_service
+from utils.security import sanitize_filename, validate_file_signature
 import hashlib
 import io
 from datetime import datetime, timezone
@@ -40,14 +43,24 @@ share_service = ShareService()
 def check_document_access(document, user_id):
     """
     Check if the user has access to the document (owner or via share).
-    Returns True if access is granted.
+    Returns True if access is granted and the share has not expired.
     """
     if document.owner_id == user_id:
         return True
-    # Check if there is a share record for this document and user with at least view permission
+    
+    # Check if there is a share record for this document and user
     share = share_service.get_share_for_document_and_user(document.doc_id, user_id)
-    if share and share.permission in ['view', 'download']:
+    if not share:
+        return False
+        
+    # Check if share has expired
+    if share_service.is_share_expired(share):
+        return False
+        
+    # Allow access if they have a valid role or legacy permission
+    if share.role in ['viewer', 'editor', 'commenter'] or share.permission in ['view', 'download']:
         return True
+        
     return False
 
 # API Routes (unchanged)
@@ -66,16 +79,27 @@ def upload_document():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    # Check if file type is allowed
-    if not allowed_file(file.filename):
+    # Sanitize the filename to prevent traversal and shell injections
+    sanitized_filename_val = sanitize_filename(file.filename)
+
+    # Check if file type is allowed by extension
+    if not allowed_file(sanitized_filename_val):
         return jsonify({'error': 'File type not allowed. Please upload a valid document type.'}), 400
 
     # Get the current user from the request (set by token_required decorator)
     owner_id = request.user['uid']
 
-    # Read the file data
+    # Read the file data and enforce size limits
     file_data = file.read()
     file_size = len(file_data)
+
+    max_size = current_app.config.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024)
+    if file_size > max_size:
+        return jsonify({'error': f'File size exceeds limit of {max_size // (1024 * 1024)}MB'}), 400
+
+    # Check file signature / magic bytes to prevent MIME spoofing
+    if not validate_file_signature(file_data, sanitized_filename_val):
+        return jsonify({'error': 'File content does not match its file extension (spoofing detected).'}), 400
 
     # Compute hash of the file for duplicate detection
     file_hash = hashlib.sha256(file_data).hexdigest()
@@ -83,12 +107,12 @@ def upload_document():
     # Guess content type from filename
     content_type = file.content_type
     if content_type == 'application/octet-stream' or not content_type:
-        content_type = guess_type(file.filename)[0] or 'application/octet-stream'
+        content_type = guess_type(sanitized_filename_val)[0] or 'application/octet-stream'
 
     # Upload to Firebase Storage
     try:
         storage_url, storage_path = storage_service.upload_file(
-            file_data, file.filename, content_type=content_type
+            file_data, sanitized_filename_val, content_type=content_type
         )
         logger.info(f"Storage upload successful: {storage_path}")
     except Exception as e:
@@ -100,7 +124,7 @@ def upload_document():
     # Create document metadata
     document = Document(
         owner_id=owner_id,
-        filename=file.filename,
+        filename=sanitized_filename_val,
         content_type=content_type,
         size=file_size,
         storage_path=storage_path,
@@ -114,11 +138,28 @@ def upload_document():
     try:
         document = document_service.create_document(document)
         logger.info(f"Document saved successfully: {document.doc_id}")
+
+        # Log audit action
+        audit_log = AuditLog(
+            user_id=owner_id,
+            action='DOCUMENT_UPLOAD',
+            resource_type='document',
+            resource_id=document.doc_id,
+            details=f"Uploaded document {sanitized_filename_val} ({file_size} bytes)",
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string if request.user_agent else None
+        )
+        audit_service.log_action(audit_log)
+
     except Exception as e:
         logger.error(f"Error creating document record: {e}")
         import traceback
         traceback.print_exc()
-        # TODO: Optionally delete the uploaded file from storage
+        # Delete file from storage to maintain consistency
+        try:
+            storage_service.delete_file(storage_path)
+        except Exception as delete_err:
+            logger.error(f"Failed to cleanup storage for path {storage_path}: {delete_err}")
         return jsonify({'error': 'Failed to save document metadata'}), 500
 
     # Process the document for intelligence (text extraction, embedding, etc.)
@@ -187,6 +228,21 @@ def download_document(doc_id):
         logger.error(f"Error downloading file from storage: {e}")
         return jsonify({'error': 'Failed to download file'}), 500
 
+    # Log audit action
+    try:
+        audit_log = AuditLog(
+            user_id=request.user['uid'],
+            action='DOCUMENT_DOWNLOAD',
+            resource_type='document',
+            resource_id=doc_id,
+            details=f"Downloaded document {document.filename}",
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string if request.user_agent else None
+        )
+        audit_service.log_action(audit_log)
+    except Exception as audit_err:
+        logger.error(f"Failed to log download audit: {audit_err}")
+
     # Return the file as a downloadable response
     return send_file(
         io.BytesIO(file_data),
@@ -194,6 +250,7 @@ def download_document(doc_id):
         as_attachment=True,
         download_name=document.filename
     )
+
 
 @documents_bp.route('/<doc_id>', methods=['PUT'])
 @token_required
@@ -206,9 +263,9 @@ def update_document(doc_id):
     if not document:
         return jsonify({'error': 'Document not found'}), 404
 
-    # Check if the current user has access to the document
-    if not check_document_access(document, request.user['uid']):
-        return jsonify({'error': 'Access denied'}), 403
+    # Only the owner can update document metadata
+    if document.owner_id != request.user['uid']:
+        return jsonify({'error': 'Access denied. Only the owner can modify this document.'}), 403
 
     data = request.get_json()
     if not data:
@@ -224,6 +281,18 @@ def update_document(doc_id):
 
     try:
         document = document_service.update_document(document)
+        
+        # Log audit action
+        audit_log = AuditLog(
+            user_id=request.user['uid'],
+            action='DOCUMENT_UPDATE',
+            resource_type='document',
+            resource_id=doc_id,
+            details=f"Updated document {document.filename} fields: {list(data.keys())}",
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string if request.user_agent else None
+        )
+        audit_service.log_action(audit_log)
     except Exception as e:
         logger.error(f"Error updating document: {e}")
         return jsonify({'error': 'Failed to update document'}), 500
@@ -232,6 +301,7 @@ def update_document(doc_id):
         'message': 'Document updated successfully',
         'document': document.to_dict()
     }), 200
+
 
 @documents_bp.route('/<doc_id>', methods=['DELETE'])
 @token_required
@@ -243,9 +313,9 @@ def delete_document(doc_id):
     if not document:
         return jsonify({'error': 'Document not found'}), 404
 
-    # Check if the current user has access to the document
-    if not check_document_access(document, request.user['uid']):
-        return jsonify({'error': 'Access denied'}), 403
+    # Only the owner can delete the document
+    if document.owner_id != request.user['uid']:
+        return jsonify({'error': 'Access denied. Only the owner can delete this document.'}), 403
 
     # Delete the file from storage
     try:
@@ -258,6 +328,18 @@ def delete_document(doc_id):
     # Delete the document metadata from Firestore
     try:
         document_service.delete_document(doc_id)
+
+        # Log audit action
+        audit_log = AuditLog(
+            user_id=request.user['uid'],
+            action='DOCUMENT_DELETE',
+            resource_type='document',
+            resource_id=doc_id,
+            details=f"Deleted document {document.filename}",
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string if request.user_agent else None
+        )
+        audit_service.log_action(audit_log)
     except Exception as e:
         logger.error(f"Error deleting document metadata: {e}")
         return jsonify({'error': 'Failed to delete document metadata'}), 500
@@ -301,27 +383,41 @@ def list_documents():
 @token_required
 def share_document(doc_id):
     """
-    Share a document with another user.
+    Share a document with another user by email.
+    Supports role-based permissions and optional expiration.
     """
     document = document_service.get_document(doc_id)
     if not document:
         return jsonify({'error': 'Document not found'}), 404
 
-    # Check if the current user has access to the document
-    if not check_document_access(document, request.user['uid']):
-        return jsonify({'error': 'Access denied'}), 403
+    # Only the owner can share a document
+    if document.owner_id != request.user['uid']:
+        return jsonify({'error': 'Only the document owner can share it'}), 403
 
     data = request.get_json()
     if not data or 'email' not in data:
         return jsonify({'error': 'Email is required'}), 400
 
-    email = data['email']
-    permission = data.get('permission', 'view')  # view, comment, edit
+    email = data['email'].strip().lower()
+    role = data.get('role', 'viewer')  # viewer, editor, commenter
+    permission = data.get('permission', 'view')  # legacy compat
+    message = data.get('message')
+    expires_at = data.get('expires_at')  # ISO 8601 string or None
 
-    # Share the document
+    if role not in ('viewer', 'editor', 'commenter'):
+        return jsonify({'error': 'Invalid role. Must be viewer, editor, or commenter'}), 400
+
     try:
-        share_service.share_document(document.doc_id, request.user['uid'], email, permission)
-        return jsonify({'message': 'Document shared successfully'}), 200
+        share = share_service.share_document(
+            document_id=document.doc_id,
+            owner_id=request.user['uid'],
+            email=email,
+            permission=permission,
+            role=role,
+            expires_at=expires_at,
+            message=message,
+        )
+        return jsonify({'message': 'Document shared successfully', 'share_id': share.share_id}), 200
     except Exception as e:
         logger.error(f"Error sharing document: {e}")
         return jsonify({'error': 'Failed to share document'}), 500

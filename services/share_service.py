@@ -65,3 +65,54 @@ class ShareService:
         except Exception as e:
             return None
         return None
+
+    # ------------------------------------------------------------------ #
+    #  Convenience methods added in Phase 3                               #
+    # ------------------------------------------------------------------ #
+
+    def share_document(self, document_id: str, owner_id: str, email: str,
+                       permission: str = 'view', role: str = 'viewer',
+                       expires_at=None, message: str = None) -> Share:
+        """
+        High-level method to share a document with a user by email.
+        Creates a Share record with the new role and optional expiration.
+        Called by the /documents/<doc_id>/share route.
+        """
+        share = Share(
+            document_id=document_id,
+            owner_id=owner_id,
+            shared_with_email=email,
+            permission=permission,
+            role=role,
+            expires_at=expires_at,
+            message=message,
+        )
+        return self.create_share(share)
+
+    def list_shares_for_document(self, document_id: str) -> List[Share]:
+        """List all active shares for a document."""
+        shares = []
+        try:
+            query = self.collection.where('document_id', '==', document_id)
+            for snap in query.stream():
+                share = Share.from_dict(snap.to_dict())
+                if not self.is_share_expired(share):
+                    shares.append(share)
+        except Exception:
+            pass
+        return shares
+
+    @staticmethod
+    def is_share_expired(share: Share) -> bool:
+        """Check if a share has expired based on its expires_at field."""
+        if not hasattr(share, 'expires_at') or share.expires_at is None:
+            return False
+        now = datetime.now(timezone.utc)
+        # Handle both datetime objects and ISO format strings
+        if isinstance(share.expires_at, str):
+            try:
+                expires = datetime.fromisoformat(share.expires_at)
+                return now > expires
+            except (ValueError, TypeError):
+                return False
+        return now > share.expires_at

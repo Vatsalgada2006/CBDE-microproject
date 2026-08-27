@@ -77,6 +77,15 @@ Thumbs.db
 
 # Firebase service account (if you accidentally commit it)
 */serviceAccountKey.json
+serviceAccountKey.json
+*.json
+!package.json
+!composer.json
+!manifest.json
+!tsconfig.json
+!jsconfig.json
+!.claude/settings.json
+!vercel.json
 
 # Environment backups and keys
 .env.backup

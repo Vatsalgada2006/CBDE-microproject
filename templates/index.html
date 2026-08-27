@@ -1,635 +1,256 @@
 {% extends "base.html" %}
-
 {% block content %}
-<!-- Overview Dashboard -->
-<div class="space-y-6">
-
-    <!-- Stats Row -->
-    <div class="grid grid-4 gap-4">
-        <div class="stat-card text-purple">
-            <div class="stat-icon">
-                <i class="fas fa-file-alt"></i>
-            </div>
-            <div class="stat-value" id="totalDocuments">0</div>
-            <div class="stat-label">Documents</div>
-        </div>
-        <div class="stat-card text-blue">
-            <div class="stat-icon">
-                <i class="fas fa-folder"></i>
-            </div>
-            <div class="stat-value" id="totalFolders">0</div>
-            <div class="stat-label">Folders</div>
-        </div>
-        <div class="stat-card text-green">
-            <div class="stat-icon">
-                <i class="fas fa-share-alt"></i>
-            </div>
-            <div class="stat-value" id="sharedDocuments">0</div>
-            <div class="stat-label">Shared</div>
-        </div>
-        <div class="stat-card text-orange">
-            <div class="stat-icon">
-                <i class="fas fa-robot"></i>
-            </div>
-            <div class="stat-value" id="aiProcessed">0</div>
-            <div class="stat-label">AI Processed</div>
-        </div>
+<!-- Dashboard Alpine Component -->
+<div x-data="dashboardData()" x-init="initData()">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p class="text-gray-500 text-sm mt-1">Welcome back, <span x-text="userData?.displayName || 'User'"></span></p>
     </div>
 
-    <!-- Main Content Row -->
-    <div class="grid grid-2 lg:grid-cols-[300px_1fr] gap-6">
-
-        <!-- Left Panel: Quick Access & Activity -->
-        <div class="space-y-4">
-            <!-- Quick Actions -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Quick Actions</h3>
+    <!-- Top Stats Row -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Total Documents</p>
+                    <h3 class="text-3xl font-bold text-gray-900" x-text="stats.total">--</h3>
                 </div>
-                <div class="card-content space-y-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted font-weight-medium">Create New</span>
-                        <button id="quickCreateBtn" class="btn btn-outline btn-sm">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                    <div class="space-y-2">
-                        <button class="btn btn-outline w-full text-left justify-content-start" data-action="document">
-                            <i class="fas fa-file-alt me-2"></i> Document
-                        </button>
-                        <button class="btn btn-outline w-full text-left justify-content-start" data-action="folder">
-                            <i class="fas fa-folder me-2"></i> Folder
-                        </button>
-                        <button class="btn btn-outline w-full text-left justify-content-start" data-action="note">
-                            <i class="fas fa-sticky-note me-2"></i> Note
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Activity -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Recent Activity</h3>
-                </div>
-                <div class="card-content">
-                    <div class="activity-list" id="activityList">
-                        <!-- Activity items will be injected here -->
-                        <div class="text-center py-4 text-muted">
-                            No recent activity
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Storage Usage -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Storage Usage</h3>
-                </div>
-                <div class="card-content">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between">
-                            <span>Documents</span>
-                            <span id="storageDocuments">0 GB</span>
-                        </div>
-                    </div>
-                    <div class="progress-container">
-                        <div class="progress-bar bg-purple" id="storageProgress"></div>
-                    </div>
-                    <div class="mt-2 d-flex justify-content-between text-sm">
-                        <span>Used: <span id="storageUsed">0 GB</span></span>
-                        <span>Free: <span id="storageFree">0 GB</span></span>
-                    </div>
+                <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-primary">
+                    <i class="fas fa-file-alt"></i>
                 </div>
             </div>
         </div>
-
-        <!-- Right Panel: Documents & Analytics -->
-        <div class="space-y-4">
-            <!-- Recent Documents -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h3 class="card-title">Recent Documents</h3>
-                    <a href="/documents/view" class="btn btn-outline btn-sm">View All</a>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Pending AI Processing</p>
+                    <h3 class="text-3xl font-bold text-gray-900" x-text="stats.processing">--</h3>
                 </div>
-                <div class="card-content">
-                    <div class="recent-docs-list" id="recentDocsList">
-                        <!-- Recent documents will be injected here -->
-                        <div class="text-center py-4 text-muted">
-                            No documents yet
-                        </div>
-                    </div>
+                <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500">
+                    <i class="fas fa-microchip"></i>
                 </div>
             </div>
-
-            <!-- Quick Analytics -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Document Analytics</h3>
+            <p class="text-xs text-amber-600 mt-4" x-show="stats.processing > 0"><i class="fas fa-clock mr-1"></i> Analyzing contents...</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Shared with me</p>
+                    <h3 class="text-3xl font-bold text-gray-900" x-text="stats.shared">--</h3>
                 </div>
-                <div class="card-content">
-                    <div class="space-y-4">
-                        <!-- File Type Distribution -->
-                        <div>
-                            <h4 class="font-weight-medium mb-2">File Types</h4>
-                            <div id="fileTypeChart" style="height: 180px;"></div>
-                        </div>
-
-                        <!-- Activity Timeline -->
-                        <div>
-                            <h4 class="font-weight-medium mb-2">Activity Timeline</h4>
-                            <div id="activityTimeline" style="height: 180px;"></div>
-                        </div>
-                    </div>
+                <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-500">
+                    <i class="fas fa-user-friends"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Storage Used</p>
+                    <h3 class="text-3xl font-bold text-gray-900" x-text="storage.usedGB + ' GB'">--</h3>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-500">
+                    <i class="fas fa-database"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-500">Usage limit</span>
+                    <span class="text-gray-500" x-text="storage.percent + '%'"></span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-1.5">
+                    <div class="bg-primary h-1.5 rounded-full" :style="'width: ' + storage.percent + '%'"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bottom Row: Notifications & Quick Share -->
-    <div class="grid grid-2 gap-4">
-        <!-- Notifications -->
-        <divclass="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title">Notifications</h3>
-                <a href="#" class="btn btn-outline btn-sm" id="viewAllNotifications">View All</a>
+    <!-- Main Content Area: 2 Columns -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Recent Documents -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 class="font-semibold text-gray-800">Recent Documents</h3>
+                <a href="/documents/view" class="text-sm text-primary hover:text-primary-hover font-medium">View All <i class="fas fa-arrow-right ml-1"></i></a>
             </div>
-            <div class="card-content">
-                <div class="notifications-list" id="notificationsList">
-                    <!-- Notifications will be injected here -->
-                    <div class="text-center py-4 text-muted">
-                        No notifications
-                    </div>
-                </div>
+            <div class="p-0 overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        <!-- Loading State -->
+                        <tr x-show="loading.docs">
+                            <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-primary text-xl"></i>
+                                <p class="mt-2 text-sm">Loading recent documents...</p>
+                            </td>
+                        </tr>
+                        <!-- Empty State -->
+                        <tr x-show="!loading.docs && recentDocs.length === 0" style="display: none;">
+                            <td colspan="4" class="px-6 py-8 text-center">
+                                <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-400 text-2xl">
+                                    <i class="fas fa-folder-open"></i>
+                                </div>
+                                <p class="text-gray-500 font-medium">No documents yet</p>
+                                <p class="text-gray-400 text-sm mt-1 mb-4">Upload your first document to get started.</p>
+                                <a href="/upload" class="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors">
+                                    <i class="fas fa-upload"></i> Upload File
+                                </a>
+                            </td>
+                        </tr>
+                        <!-- Documents List -->
+                        <template x-for="doc in recentDocs" :key="doc.id">
+                            <tr class="hover:bg-gray-50 cursor-pointer transition-colors" @click="window.location.href='/documents/view/' + doc.id">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-10 h-10 flex-shrink-0 rounded flex items-center justify-center text-lg bg-gray-100" :class="getIconColorClass(doc.content_type)">
+                                            <i :class="getIconClass(doc.content_type)"></i>
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900 truncate max-w-[180px]" x-text="doc.filename"></div>
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                <span x-show="doc.processing_status === 'completed'" class="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">AI Analyzed</span>
+                                                <span x-show="doc.processing_status === 'pending'" class="text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Processing</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-500" x-text="doc.document_type || 'Unknown'"></div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatSize(doc.file_size)">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500" x-text="formatDate(doc.CreatedAt)">
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Quick Share -->
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Quick Share</h3>
+        <!-- Right Sidebar (Activity) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 class="font-semibold text-gray-800">Recent Activity</h3>
             </div>
-            <div class="card-content">
-                <form id="quickShareForm">
-                    <div class="mb-3">
-                        <label class="form-label">Share via Link</label>
-                        <div class="input-group">
-                            <input type="text" id="shareLink" class="form-input" placeholder="Shareable link will appear here..." readonly>
-                            <button type="button" class="btn btn-outline" id="copyLinkBtn">
-                                <i class="fas fa-copy"></i>
-                            </button>
+            <div class="p-6">
+                <!-- Loading State -->
+                <div x-show="loading.activity" class="text-center py-6 text-gray-500">
+                    <i class="fas fa-spinner fa-spin text-primary"></i>
+                </div>
+                
+                <!-- Empty State -->
+                <div x-show="!loading.activity && activity.length === 0" style="display: none;" class="text-center py-6 text-gray-400">
+                    <p>No recent activity</p>
+                </div>
+
+                <!-- Timeline -->
+                <div class="relative border-l border-gray-200 ml-3 space-y-6">
+                    <template x-for="item in activity" :key="item.id">
+                        <div class="relative pl-6">
+                            <div class="absolute -left-1.5 top-1.5 w-3 h-3 bg-gray-200 rounded-full border-2 border-white"></div>
+                            <p class="text-sm font-medium text-gray-800" x-text="item.action_desc"></p>
+                            <p class="text-xs text-gray-500 mt-1" x-text="formatTimeAgo(item.timestamp)"></p>
                         </div>
-                        <small class="text-muted d-block mt-1">Link expires in 7 days</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Email Sharing</label>
-                        <input type="email" id="shareEmail" class="form-input" placeholder="Enter email address">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Permission</label>
-                        <select class="form-input" id="sharePermission">
-                            <option value="view">Can view</option>
-                            <option value="download">Can download</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-full">
-                        Share Document
-                    </button>
-                </form>
-                <div id="quickShareResult" class="mt-3"></div>
+                    </template>
+                </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
+{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Load overview data
-        loadOverviewStats();
-        loadRecentActivity();
-        loadRecentDocuments();
-        loadNotifications();
-        loadStorageInfo();
-        loadAnalytics();
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('dashboardData', () => ({
+            stats: { total: 0, processing: 0, shared: 0 },
+            storage: { usedGB: 0, percent: 0, limitGB: 10 },
+            recentDocs: [],
+            activity: [],
+            loading: { docs: true, activity: true },
 
-        // Quick create button
-        const quickCreateBtn = document.getElementById('quickCreateBtn');
-        if (quickCreateBtn) {
-            quickCreateBtn.addEventListener('click', function() {
-                document.getElementByid('createModal').classList.remove('hidden');
-            });
-        }
+            async initData() {
+                try {
+                    const res = await window.authenticatedFetch('/intelligence/dashboard/data');
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        this.stats.total = data.total_documents || 0;
+                        
+                        // Calculate processing (documents where extraction or intelligence is pending/processing)
+                        const extPending = (data.extraction_status_counts?.pending || 0) + (data.extraction_status_counts?.processing || 0);
+                        const intPending = (data.intelligence_status_counts?.pending || 0) + (data.intelligence_status_counts?.processing || 0);
+                        this.stats.processing = extPending + intPending;
+                        
+                        this.stats.shared = data.total_shared || 0;
+                        
+                        const bytes = data.total_size_bytes || 0;
+                        this.storage.usedGB = (bytes / (1024*1024*1024)).toFixed(2);
+                        this.storage.percent = Math.min((this.storage.usedGB / this.storage.limitGB) * 100, 100).toFixed(1);
+                        
+                        this.recentDocs = data.recent_documents || [];
+                    }
+                } catch (e) {
+                    console.error("Dashboard fetch error:", e);
+                } finally {
+                    this.loading.docs = false;
+                }
 
-        // Copy link button
-        const copyLinkBtn = document.getElementById('copyLinkBtn');
-        if (copyLinkBtn) {
-            copyLinkBtn.addEventListener('click', function() {
-                const shareLink = document.getElementById('shareLink');
-                shareLink.select();
-                document.execCommand('copy');
-                showTooltip(copyLinkBtn, 'Link copied!');
-            });
-        }
+                // Temporary activity mock until activity endpoints are completed
+                this.loading.activity = false;
+                this.activity = [
+                    { id: 1, action_desc: "Workspace initialized", timestamp: new Date().toISOString() }
+                ];
+            },
 
-        // Quick share form
-        const quickShareForm = document.getElementById('quickShareForm');
-        if (quickShareForm) {
-            quickShareForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                handleQuickShare();
-            });
-        }
+            formatSize(bytes) {
+                if (!bytes) return '0 B';
+                const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            },
 
-        // View all notifications
-        const viewAllNotifications = document.getElementById('viewAllNotifications');
-        if (viewAllNotifications) {
-            viewAllNotifications.addEventListener('click', function(e) {
-                e.preventDefault();
-                // TODO: Navigate to notifications page
-                alert('Notifications page coming soon!');
-            });
-        }
+            formatDate(iso) {
+                if (!iso) return '';
+                return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            },
+
+            formatTimeAgo(iso) {
+                if (!iso) return '';
+                const diff = Math.floor((new Date() - new Date(iso)) / 1000);
+                if (diff < 60) return "Just now";
+                if (diff < 3600) return Math.floor(diff/60) + "m ago";
+                if (diff < 86400) return Math.floor(diff/3600) + "h ago";
+                return Math.floor(diff/86400) + "d ago";
+            },
+
+            getIconClass(type) {
+                type = (type || '').toLowerCase();
+                if (type.includes('pdf')) return 'fas fa-file-pdf';
+                if (type.includes('word') || type.includes('document')) return 'fas fa-file-word';
+                if (type.includes('sheet') || type.includes('excel')) return 'fas fa-file-excel';
+                if (type.includes('image')) return 'fas fa-file-image';
+                return 'fas fa-file-alt';
+            },
+
+            getIconColorClass(type) {
+                type = (type || '').toLowerCase();
+                if (type.includes('pdf')) return 'bg-red-50 text-red-500';
+                if (type.includes('word') || type.includes('document')) return 'bg-blue-50 text-blue-500';
+                if (type.includes('sheet') || type.includes('excel')) return 'bg-emerald-50 text-emerald-500';
+                if (type.includes('image')) return 'bg-purple-50 text-purple-500';
+                return 'bg-gray-100 text-gray-500';
+            }
+        }));
     });
-
-    function loadOverviewStats() {
-        // Fetch stats from API
-        authenticatedFetch('/intelligence/dashboard/data')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('totalDocuments').textContent = data.total_documents || 0;
-                document.getElementById('totalFolders').textContent = data.total_folders || 0;
-                document.getElementById('sharedDocuments').textContent = data.total_shared || 0;
-                document.getElementById('aiProcessed').textContent = data.ai_processed || 0;
-            })
-            .catch(error => {
-                console.error('Error loading stats:', error);
-                // Set default values
-                document.getElementById('totalDocuments').textContent = '0';
-                document.getElementById('totalFolders').textContent = '0';
-                document.getElementById('sharedDocuments').textContent = '0';
-                document.getElementById('aiProcessed').textContent = '0';
-            });
-    }
-
-    function loadRecentActivity() {
-        // Fetch recent activity from dashboard endpoint
-        const activityList = document.getElementById('activityList');
-        if (!activityList) return;
-
-        authenticatedFetch('/intelligence/dashboard/data')
-            .then(response => response.json())
-            .then(data => {
-                const documents = data.recent_documents || [];
-                if (documents.length === 0) {
-                    activityList.innerHTML = '<div class="text-center py-4 text-muted">No recent activity</div>';
-                    return;
-                }
-
-                activityList.innerHTML = documents.map(doc => `
-                    <div class="activity-item d-flex align-items-start mb-3">
-                        <div class="flex-shrink-0">
-                            <div class="activity-icon bg-purple-light text-purple rounded-circle">
-                                <i class="${getActivityIcon('upload')}"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="activity-content">
-                                <div class="activity-title font-weight-medium">${doc.filename || 'Untitled'}</div>
-                                <div class="activity-description text-muted small">Document uploaded</div>
-                                <div class="activity-time text-muted small">${formatTimeAgo(doc.CreatedAt)}</div>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            })
-            .catch(error => {
-                console.error('Error loading activity:', error);
-                activityList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load activity</div>';
-            });
-    }
-
-    function loadRecentDocuments() {
-        // Fetch recent documents from dashboard endpoint
-        const recentDocsList = document.getElementById('recentDocsList');
-        if (!recentDocsList) return;
-
-        authenticatedFetch('/intelligence/dashboard/data')
-            .then(response => response.json())
-            .then(data => {
-                const documents = data.recent_documents || [];
-                if (documents.length === 0) {
-                    recentDocsList.innerHTML = '<div class="text-center py-4 text-muted">No documents yet</div>';
-                    return;
-                }
-
-                recentDocsList.innerHTML = documents.map(doc => `
-                    <div class="recent-doc-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
-                        <div class="flex-shrink-0">
-                            <div class="doc-icon bg-${getDocColorClass(doc.content_type)} text-${getDocTextColorClass(doc.content_type)} rounded-circle">
-                                <i class="${getDocIcon(doc.content_type)}"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="doc-title font-weight-medium">${doc.filename || 'Untitled'}</div>
-                            <div class="doc-meta text-muted small d-flex justify-content-between">
-                                <span>${formatFileSize(doc.size)}</span>
-                                <span>${formatDate(doc.CreatedAt)}</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            })
-            .catch(error => {
-                console.error('Error loading recent documents:', error);
-                recentDocsList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load documents</div>';
-            });
-    }
-
-    function loadNotifications() {
-        // Fetch notifications from dashboard endpoint and shares
-        const notificationsList = document.getElementById('notificationsList');
-        if (!notificationsList) return;
-
-        // Fetch both dashboard data and shares to create meaningful notifications
-        Promise.all([
-            authenticatedFetch('/intelligence/dashboard/data').then(res => res.json()),
-            authenticatedFetch(`/sharing/`).then(res => res.json()).then(data => {
-                // Filter shares where the current user is the recipient
-                // Only fetch shares if user is logged in
-                if (window.userData && window.userData.uid) {
-                    const allShares = data.shares || [];
-                    return allShares.filter(share => share.shared_with_id === window.userData.uid);
-                }
-                return []; // Return empty array if not logged in
-        ])
-        .then(([dashboardData, sharesData]) => {
-            const documents = dashboardData.recent_documents || [];
-            const shares = sharesData || [];
-            let notificationsHTML = '';
-
-            // Add share notifications (only if user is logged in)
-            // Add share notifications (only if user is logged in)
-            if (window.userData && window.userData.uid && shares.length > 0) {
-                notificationsHTML += shares.map(share => `
-                    <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
-                        <div class="flex-shrink-0">
-                            <div class="notification-icon bg-success-light text-success rounded-circle">
-                                <i class="fas fa-share-alt"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="notification-content">
-                                <h3 class="notification-title font-weight-medium">Document shared with you</h3>
-                                <div class="notification-text text-muted small">${share.filename || 'A document'} was shared with you</div>
-                                <div class="notification-time text-muted small">${formatTimeAgo(share.sharedAt || share.CreatedAt)}</div>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            // Add upload notifications from recent documents
-            if (documents.length > 0) {
-                notificationsHTML += documents.map(doc => `
-                    <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
-                        <div class="flex-shrink-0">
-                            <div class="notification-icon bg-info-light text-info rounded-circle">
-                                <i class="fas fa-upload"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="notification-content">
-                                <h3 class="notification-title font-weight-medium">Document uploaded</h3>
-                                <div class="notification-text text-muted small">${doc.filename || 'Untitled'} was uploaded</div>
-                                <div class="notification-time text-muted small">${formatTimeAgo(doc.CreatedAt)}</div>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            // If no notifications, show welcome message
-            if (notificationsHTML === '') {
-                notificationsHTML = `
-                    <div class="notification-item d-flex align-items-start mb-3 p-3 bg-surface-light rounded">
-                        <div class="flex-shrink-0">
-                            <div class="notification-icon bg-info-light text-info rounded-circle">
-                                <i class="fas fa-info-circle"></i>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="notification-content">
-                                <h3 class="notification-title font-weight-medium">Welcome to IntelliDoc</h3>
-                                <div class="notification-text text-muted small">Your document management system is ready to use</div>
-                                <div class="notification-time text-muted small">Just now</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            notificationsList.innerHTML = notificationsHTML;
-        })
-        .catch(error => {
-            console.error('Error loading notifications:', error);
-            notificationsList.innerHTML = '<div class="text-center py-4 text-muted">Unable to load notifications</div>';
-        });
-    }
-
-    function loadStorageInfo() {
-        // Fetch storage info from dashboard endpoint
-        authenticatedFetch('/intelligence/dashboard/data')
-            .then(response => response.json())
-            .then(data => {
-                const totalSizeBytes = data.total_size_bytes || 0;
-                const totalSizeGB = (totalSizeBytes / (1024 * 1024 * 1024)).toFixed(2);
-                const storageLimit = 100; // 100 GB limit - in a real app, this would come from user's plan
-                const usagePercent = Math.min(((totalSizeBytes / (storageLimit * 1024 * 1024 * 1024)) * 100).toFixed(1), 100);
-
-                document.getElementById('storageDocuments').textContent = `${totalSizeGB} GB`;
-                document.getElementById('storageProgress').style.width = `${usagePercent}%`;
-                document.getElementById('storageUsed').textContent = `${totalSizeGB} GB`;
-                document.getElementById('storageFree').textContent = `${(storageLimit - parseFloat(totalSizeGB)).toFixed(2)} GB`;
-            })
-            .catch(error => {
-                console.error('Error loading storage info:', error);
-                // Set default values
-                document.getElementById('storageDocuments').textContent = '0 GB';
-                document.getElementById('storageProgress').style.width = '0%';
-                document.getElementById('storageUsed').textContent = '0 GB';
-                document.getElementById('storageFree').textContent = '0 GB';
-            });
-    }
-
-    function loadAnalytics() {
-        // Load charts (simplified for now)
-        // In a real implementation, you would use Chart.js or similar
-        const fileTypeChart = document.getElementById('fileTypeChart');
-        if (fileTypeChart) {
-            fileTypeChart.innerHTML = '<div class="text-center py-4 text-muted">File type distribution chart</div>';
-        }
-
-        const activityTimeline = document.getElementById('activityTimeline');
-        if (activityTimeline) {
-            activityTimeline.innerHTML = '<div class="text-center py-4 text-muted">Activity timeline chart</div>';
-        }
-    }
-
-    function handleQuickShare() {
-        const shareEmail = document.getElementById('shareEmail').value.trim();
-        const sharePermission = document.getElementById('sharePermission').value;
-
-        if (!shareEmail) {
-            showError('Please enter an email address');
-            return;
-        }
-
-        // Simulate sharing
-        const shareResult = document.getElementById('quickShareResult');
-        shareResult.innerHTML = `
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle alert-icon me-2"></i>
-                Document shared successfully with ${shareEmail}
-            </div>
-        `;
-
-        // Clear form and show link
-        document.getElementById('shareEmail').value = '';
-        document.getElementById('shareLink').value = 'https://intellidoc.example.com/share/abc123';
-
-        // Hide result after 3 seconds
-        setTimeout(() => {
-            shareResult.innerHTML = '';
-        }, 3000);
-    }
-
-    // Helper functions
-    function getActivityIcon(type) {
-        const icons = {
-            'upload': 'fas fa-upload',
-            'share': 'fas fa-share-alt',
-            'create': 'fas fa-plus',
-            'delete': 'fas fa-trash-alt',
-            'update': 'fas fa-edit',
-            'ai': 'fas fa-robot'
-        };
-        return icons[type] || 'fas fa-file';
-    }
-
-    function getDocIcon(contentType) {
-        if (!contentType) return 'fas fa-file';
-        const lower = contentType.toLowerCase();
-        if (lower.includes('pdf')) return 'fas fa-file-pdf';
-        if (lower.includes('msword') || lower.includes('word')) return 'fas fa-file-word';
-        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'fas fa-file-excel';
-        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'fas fa-file-powerpoint';
-        if (lower.includes('image')) return 'fas fa-file-image';
-        if (lower.includes('text')) return 'fas fa-file-alt';
-        return 'fas fa-file';
-    }
-
-    function getDocColorClass(contentType) {
-        if (!contentType) return 'purple';
-        const lower = contentType.toLowerCase();
-        if (lower.includes('pdf')) return 'red';
-        if (lower.includes('msword') || lower.includes('word')) return 'blue';
-        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'green';
-        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'orange';
-        if (lower.includes('image')) return 'pink';
-        if (lower.includes('text')) return 'indigo';
-        return 'purple';
-    }
-
-    function getDocTextColorClass(contentType) {
-        if (!contentType) return 'white';
-        const lower = contentType.toLowerCase();
-        if (lower.includes('pdf')) return 'white';
-        if (lower.includes('msword') || lower.includes('word')) return 'white';
-        if (lower.includes('excel') || lower.includes('spreadsheet')) return 'white';
-        if (lower.includes('powerpoint') || lower.includes('presentation')) return 'white';
-        if (lower.includes('image')) return 'white';
-        if (lower.includes('text')) return 'white';
-        return 'white';
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        const options = { year: 'numeric', month: 'short', day: 'numeric' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
-    }
-
-    function formatTimeAgo(timestamp) {
-        if (!timestamp) return '';
-        const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
-        let interval = Math.floor(seconds / 31536000);
-
-        if (interval > 1) return interval + " years ago";
-        interval = Math.floor(seconds / 2592000);
-        if (interval > 1) return interval + " months ago";
-        interval = Math.floor(seconds / 86400);
-        if (interval > 1) return interval + " days ago";
-        interval = Math.floor(seconds / 3600);
-        if (interval > 1) return interval + " hours ago";
-        interval = Math.floor(seconds / 60);
-        if (interval > 1) return interval + " minutes ago";
-        return Math.floor(seconds) + " seconds ago";
-    }
-
-    function showError(message) {
-        // Create error alert
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-error';
-        alertDiv.innerHTML = `
-            <i class="fas fa-times-circle alert-icon me-2"></i>
-            ${message}
-        `;
-
-        const container = document.querySelector('.page-content');
-        if (container) {
-            container.insertBefore(alertDiv, container.firstChild);
-
-            // Remove after 3 seconds
-            setTimeout(() => {
-                alertDiv.remove();
-            }, 3000);
-        }
-    }
-
-    function showTooltip(element, message) {
-        // Simple tooltip implementation
-        const tooltip = document.createElement('div');
-        tooltip.className = 'tooltip';
-        tooltip.style.position = 'absolute';
-        tooltip.style.backgroundColor = 'var(--neutral-800)';
-        tooltip.style.color = 'var(--neutral-50)';
-        tooltip.style.padding = '0.25rem 0.5rem';
-        tooltip.style.borderRadius = 'var(--radius-sm)';
-        tooltip.style.fontSize = '0.75rem';
-        tooltip.style.whiteSpace = 'nowrap';
-        tooltip.style.zIndex = 'var(--z-index-tooltip)';
-        tooltip.textContent = message;
-
-        document.body.appendChild(tooltip);
-
-        const rect = element.getBoundingClientRect();
-        tooltip.style.left = `${rect.left + window.scrollX}px`;
-        tooltip.style.top = `${rect.top + window.scrollY - 30}px`;
-
-        // Remove after 1.5 seconds
-        setTimeout(() => {
-            tooltip.remove();
-        }, 1500);
-    }
 </script>
 {% endblock %}

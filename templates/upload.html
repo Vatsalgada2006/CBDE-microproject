@@ -1,273 +1,206 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="page-header fade-in fade-in-delay-1">
-    <h1><i class="fas fa-upload holographic"></i> Upload Document</h1>
-    <p>Upload a new document to your IntelliDoc library</p>
-</div>
-
-<!-- Alert Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        <div class="mb-4">
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} fade-in fade-in-delay-2">
-                    <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'error' %}fa-times-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %} alert-icon"></i>
-                    <div class="alert-message">{{ message }}</div>
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-{% endwith %}
-
-<div class="card card-3d fade-in fade-in-delay-3">
-    <div class="card-header">
-        <h2><i class="fas fa-file-import holographic"></i> Select Document to Upload</h2>
+<div x-data="uploadComponent()" class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Upload Document</h1>
+        <p class="text-gray-500 text-sm mt-1">Add files to your workspace for intelligent processing.</p>
     </div>
-    <div class="card-body">
-        <form id="uploadForm" class="space-y-4" enctype="multipart/form-data">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-2">Choose a file</label>
-                <div class="relative cursor-pointer bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
-                    <input type="file" id="fileInput" name="file" class="hidden" required>
-                    <div class="flex flex-col items-center justify-center py-8">
-                        <i class="fas fa-cloud-upload-alt fa-3x text-gray-400 mb-3"></i>
-                        <p class="text-gray-300">Click to select a file or drag and drop here</p>
-                        <p class="text-xs text-gray-500">Supported formats: PDF, DOC, DOCX, TXT, JPG, PNG, and more</p>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-500 mt-2">Max file size: 25 MB</p>
-            </div>
 
-            <div class="flex items-center space-x-3">
-                <input type="checkbox" id="termsCheckbox" class="h-4 w-4 text-indigo-600 border-gray-600 rounded">
-                <label for="termsCheckbox" class="text-sm text-gray-300">
-                    I agree to the <a href="#" class="text-indigo-400 hover:underline">terms of service</a>
+    <!-- Drag & Drop Zone -->
+    <div 
+        @dragover.prevent="dragover = true"
+        @dragleave.prevent="dragover = false"
+        @drop.prevent="handleDrop"
+        :class="{ 'border-primary bg-primary/5': dragover, 'border-gray-300 bg-white hover:bg-gray-50': !dragover }"
+        class="relative flex justify-center px-6 pt-12 pb-16 border-2 border-dashed rounded-xl transition-colors mb-6"
+    >
+        <div class="space-y-4 text-center">
+            <div class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-primary text-2xl">
+                <i class="fas fa-cloud-upload-alt"></i>
+            </div>
+            <div class="flex text-sm text-gray-600 justify-center">
+                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-hover focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+                    <span>Upload a file</span>
+                    <input id="file-upload" name="file-upload" type="file" class="sr-only" @change="handleFileSelect" multiple>
                 </label>
+                <p class="pl-1">or drag and drop</p>
             </div>
-
-            <div class="flex justify-end">
-                <button type="submit" id="submitBtn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors" disabled>
-                    Upload Document
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Upload Progress Modal -->
-<div id="uploadProgressModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-xl w-96 mx-4 p-6">
-        <div class="text-center">
-            <div class="flex items-center justify-center mb-4">
-                <div class="animate-spin rounded-full border-4 border-t-white border-gray-700 w-12 h-12 mr-3"></div>
-                <h2 class="text class="text-xl font-bold text-white">Uploading...</htext>
-            </div>
-            <div class="space-y-4">
-                <div class="text-gray-400">
-                    <p id="uploadStatus">Preparing file...</p>
-                    <p class="text-sm" id="uploadDetails"></p>
-                </div>
-                <div class="progress-container">
-                    <div class="progress-bar" id="uploadProgressBar"></div>
-                </div>
-                <div class="flex justify-between text-sm text-gray-400">
-                    <span id="uploadSpeed">0 KB/s</span>
-                    <span id="uploadETA">--:--</span>
-                </div>
-            </div>
-            <div class="mt-6">
-                <button id="cancelUploadBtn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md w-full">
-                    Cancel Upload
-                </button>
-            </div>
+            <p class="text-xs text-gray-500">
+                PDF, DOCX, XLSX, TXT, PNG, JPG up to 10MB
+            </p>
         </div>
+    </div>
+
+    <!-- Selected Files List -->
+    <div x-show="files.length > 0" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6" style="display: none;">
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <h3 class="font-semibold text-gray-800">Files to Upload (<span x-text="files.length"></span>)</h3>
+            <button @click="uploadAll" :disabled="uploading" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="fas fa-upload mr-2"></i> <span x-text="uploading ? 'Uploading...' : 'Upload All'"></span>
+            </button>
+        </div>
+        <ul role="list" class="divide-y divide-gray-100">
+            <template x-for="(file, index) in files" :key="index">
+                <li class="px-6 py-4 flex items-center justify-between">
+                    <div class="flex items-center flex-1 min-w-0">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0" :class="getFileIconColor(file.name)">
+                            <i :class="getFileIcon(file.name)"></i>
+                        </div>
+                        <div class="ml-4 flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate" x-text="file.name"></p>
+                            <p class="text-xs text-gray-500" x-text="formatSize(file.size)"></p>
+                            
+                            <!-- Progress Bar -->
+                            <div x-show="file.uploading || file.completed" class="mt-2 w-full bg-gray-100 rounded-full h-1.5 relative overflow-hidden" style="display: none;">
+                                <div class="bg-primary h-1.5 rounded-full transition-all duration-300" :class="{ 'bg-emerald-500': file.completed, 'bg-red-500': file.error }" :style="'width: ' + file.progress + '%'"></div>
+                            </div>
+                            <p x-show="file.error" class="text-xs text-red-500 mt-1" x-text="file.errorMessage" style="display: none;"></p>
+                        </div>
+                    </div>
+                    <div class="ml-4 shrink-0 flex items-center gap-2">
+                        <span x-show="file.completed" class="text-emerald-500" style="display: none;"><i class="fas fa-check-circle"></i></span>
+                        <button @click="removeFile(index)" x-show="!file.uploading && !file.completed" class="text-gray-400 hover:text-red-500 transition-colors p-1 rounded">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </li>
+            </template>
+        </ul>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
+{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const fileInput = document.getElementById('fileInput');
-        const uploadForm = document.getElementById('uploadForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const termsCheckbox = document.getElementById('termsCheckbox');
-        const uploadProgressModal = document.getElementById('uploadProgressModal');
-        const uploadStatus = document.getElementById('uploadStatus');
-        const uploadDetails = document.getElementById('uploadDetails');
-        const uploadProgressBar = document.getElementById('uploadProgressBar');
-        const cancelUploadBtn = document.getElementById('cancelUploadBtn');
+document.addEventListener('alpine:init', () => {
+    Alpine.data('uploadComponent', () => ({
+        dragover: false,
+        files: [],
+        uploading: false,
 
-        // File input change handler
-        fileInput.addEventListener('change', function() {
-            if (this.files.length > 0) {
-                const file = this.files[0];
-                uploadDetails.textContent = `${file.name} • ${formatFileSize(file.size)} • ${file.type || 'Unknown'}`;
-
-                // Validate file size (25MB limit)
-                if (file.size > 25 * 1024 * 1024) {
-                    alert('File size exceeds 25 MB limit');
-                    this.value = '';
-                    uploadDetails.textContent = 'No file selected';
-                    submitBtn.disabled = true;
-                } else {
-                    submitBtn.disabled = !termsCheckbox.checked;
-                }
-            } else {
-                uploadDetails.textContent = 'No file selected';
-                submitBtn.disabled = true;
+        handleDrop(e) {
+            this.dragover = false;
+            const droppedFiles = e.dataTransfer.files;
+            if (droppedFiles.length) {
+                this.addFiles(Array.from(droppedFiles));
             }
-        });
+        },
 
-        // Terms checkbox
-        termsCheckbox.addEventListener('change', function() {
-            submitBtn.disabled = !(this.checked && fileInput.files.length > 0);
-        });
-
-        // Form submission
-        uploadForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            if (!fileInput.files.length > 0) {
-                alert('Please select a file to upload');
-                return;
+        handleFileSelect(e) {
+            const selectedFiles = e.target.files;
+            if (selectedFiles.length) {
+                this.addFiles(Array.from(selectedFiles));
             }
+            e.target.value = ''; // Reset input
+        },
 
-            if (fileInput.files[0].size > 25 * 1024 * 1024) {
-                alert('File size exceeds 25 MB limit');
-                return;
-            }
-
-            // Show progress modal
-            uploadProgressModal.classList.remove('hidden');
-            uploadStatus.textContent = 'Starting upload...';
-            uploadDetails.textContent = '';
-            uploadProgressBar.style.width = '0%';
-
-            // Create FormData
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            // Submit via fetch
-            authenticatedFetch('/documents/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                // Simulate upload progress for demo
-                let progress = 0;
-                const interval = setInterval(() => {
-                    progress += Math.random() * 10;
-                    if (progress >= 95) {
-                        clearInterval(interval);
-                        progress = 100;
-                    }
-                    uploadProgressBar.style.width = progress + '%';
-                    uploadStatus.textContent = 'Processing document...';
-                    uploadDetails.textContent = 'Extracting text and generating insights...';
-
-                    if (progress >= 100) {
-                        setTimeout(() => {
-                            uploadProgressModal.classList.add('hidden');
-                            uploadForm.reset();
-                            fileInput.value = '';
-                            uploadDetails.textContent = 'No file selected';
-                            submitBtn.disabled = true;
-
-                            // Show success message
-                            showSuccessMessage('Document uploaded successfully!');
-                        }, 1000);
-                    }
-                }, 100);
-            })
-            .catch(error => {
-                console.error('Upload error:', error);
-                uploadProgressModal.classList.add('hidden');
-                alert('Upload failed: ' + error.message);
+        addFiles(newFiles) {
+            newFiles.forEach(file => {
+                this.files.push({
+                    file: file,
+                    name: file.name,
+                    size: file.size,
+                    progress: 0,
+                    uploading: false,
+                    completed: false,
+                    error: false,
+                    errorMessage: ''
+                });
             });
-        });
+        },
 
-        // Cancel upload
-        cancelUploadBtn.addEventListener('click', function() {
-            if (confirm('Are you sure you want to cancel the upload?')) {
-                uploadProgressModal.classList.add('hidden');
-                uploadForm.reset();
-                fileInput.value = '';
-                uploadDetails.textContent = 'No file selected';
-                submitBtn.disabled = true;
-            }
-        });
+        removeFile(index) {
+            this.files.splice(index, 1);
+        },
 
-        // Drag and drop functionality
-        const dropArea = uploadForm.querySelector('.relative');
-        dropArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.classList.add('bg-gray-600');
-        });
+        async uploadAll() {
+            if (this.files.length === 0 || this.uploading) return;
+            this.uploading = true;
+            
+            const pendingFiles = this.files.filter(f => !f.completed && !f.error);
+            
+            for (let f of pendingFiles) {
+                f.uploading = true;
+                f.error = false;
+                
+                // Simulate progress for UI feedback while waiting for actual upload
+                let progressInterval = setInterval(() => {
+                    if (f.progress < 85) f.progress += Math.random() * 15;
+                }, 300);
 
-        dropArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.classList.remove('bg-gray-600');
-        });
-
-        dropArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('bg-gray-600');
-
-            if (e.dataTransfer.files.length) {
-                fileInput.files = e.dataTransfer.files;
-                const file = e.dataTransfer.files[0];
-                uploadDetails.textContent = `${file.name} • ${formatFileSize(file.size)} • ${file.type || 'Unknown'}`;
-
-                // Validate file size
-                if (file.size > 25 * 1024 * 1024) {
-                    alert('File size exceeds 25 MB limit');
-                    fileInput.value = '';
-                    uploadDetails.textContent = 'No file selected';
-                    submitBtn.disabled = true;
-                } else {
-                    submitBtn.disabled = !termsCheckbox.checked;
+                try {
+                    const formData = new FormData();
+                    formData.append('file', f.file);
+                    
+                    // We must wait for auth state
+                    const token = window.getAuthToken();
+                    
+                    const response = await fetch('/documents/upload', {
+                        method: 'POST',
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                        body: formData
+                    });
+                    
+                    clearInterval(progressInterval);
+                    f.progress = 100;
+                    f.uploading = false;
+                    
+                    if (response.ok) {
+                        f.completed = true;
+                        window.showToast(`${f.name} uploaded successfully`, 'success');
+                    } else {
+                        const data = await response.json();
+                        f.error = true;
+                        f.errorMessage = data.error || 'Upload failed';
+                        window.showToast(f.errorMessage, 'error');
+                    }
+                } catch (err) {
+                    clearInterval(progressInterval);
+                    f.uploading = false;
+                    f.error = true;
+                    f.progress = 100;
+                    f.errorMessage = err.message || 'Upload failed';
+                    window.showToast(f.errorMessage, 'error');
                 }
-
-                // Trigger form submission automatically
-                uploadForm.dispatchEvent(new Event('submit'));
             }
-        });
-    });
+            
+            this.uploading = false;
+            
+            // If all successful, redirect to documents view after a short delay
+            if (this.files.every(f => f.completed)) {
+                setTimeout(() => {
+                    window.location.href = '/documents/view';
+                }, 1500);
+            }
+        },
 
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
+        formatSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
 
-    function showSuccessMessage(message) {
-        // Create success alert
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-success fade-in';
-        alertDiv.innerHTML = `
-            <i class="fas fa-check-circle alert-icon"></i>
-            <div class="alert-message">${message}</div>
-        `;
+        getFileIcon(name) {
+            name = (name || '').toLowerCase();
+            if (name.endsWith('.pdf')) return 'fas fa-file-pdf';
+            if (name.endsWith('.doc') || name.endsWith('.docx')) return 'fas fa-file-word';
+            if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'fas fa-file-excel';
+            if (name.endsWith('.jpg') || name.endsWith('.png')) return 'fas fa-file-image';
+            if (name.endsWith('.ppt') || name.endsWith('.pptx')) return 'fas fa-file-powerpoint';
+            return 'fas fa-file-alt';
+        },
 
-        // Insert at the top of main content
-        const mainContent = document.querySelector('.container main');
-        if (mainContent) {
-            mainContent.insertBefore(alertDiv, mainContent.firstChild);
-
-            // Remove after 3 seconds
-            setTimeout(() => {
-                alertDiv.remove();
-            }, 3000);
+        getFileIconColor(name) {
+            name = (name || '').toLowerCase();
+            if (name.endsWith('.pdf')) return 'bg-red-50 text-red-500';
+            if (name.endsWith('.doc') || name.endsWith('.docx')) return 'bg-blue-50 text-blue-500';
+            if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'bg-emerald-50 text-emerald-500';
+            if (name.endsWith('.jpg') || name.endsWith('.png')) return 'bg-purple-50 text-purple-500';
+            if (name.endsWith('.ppt') || name.endsWith('.pptx')) return 'bg-orange-50 text-orange-500';
+            return 'bg-gray-100 text-gray-500';
         }
-    }
+    }));
+});
 </script>
 {% endblock %}

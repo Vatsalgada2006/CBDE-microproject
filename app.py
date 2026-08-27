@@ -76,6 +76,12 @@ def create_app():
         now = time.time()
         window_start = now - window
         
+        # Prevent memory exhaustion by periodically cleaning the entire dict
+        if len(_request_counts) > 1000:
+            expired_keys = [k for k, v in _request_counts.items() if not v or max(v) < window_start]
+            for k in expired_keys:
+                _request_counts.pop(k, None)
+
         # Clean old entries
         if key in _request_counts:
             _request_counts[key] = [t for t in _request_counts[key] if t > window_start]
@@ -110,8 +116,32 @@ def create_app():
     def index():
         return render_template('index.html', title='Overview - IntelliDoc')
 
-    # Initialize demo data for presentation
-    initialize_demo_data()
+    @app.route('/inbox')
+    def inbox():
+        return render_template('inbox.html', title='AI Inbox - IntelliDoc')
+
+    @app.route('/health', methods=['GET'])
+    def health_check():
+        from services.health_service import HealthService
+        health_service = HealthService()
+        health_data = health_service.check_all()
+        
+        # Add basic environment info
+        health_data['environment'] = app.config.get('ENV')
+        
+        # Determine HTTP status code based on health
+        status_code = 200
+        if health_data.get('status') == 'unhealthy':
+            status_code = 503
+            
+        return jsonify(health_data), status_code
+
+    # Initialize demo data for presentation in development/mock mode only
+    if app.config.get('DEBUG') or os.environ.get('USE_MOCK_FIREBASE') == 'true':
+        try:
+            initialize_demo_data()
+        except Exception as e:
+            app.logger.warning(f"Could not initialize demo data: {e}")
 
     return app
 

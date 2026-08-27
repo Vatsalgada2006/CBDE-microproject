@@ -30,6 +30,8 @@ class MockFirestore:
 
 
 class MockCollection:
+    """Mock Firestore collection with query-builder support."""
+
     def __init__(self, name):
         self.name = name
         self.documents = {}  # document_id -> MockDocument
@@ -39,39 +41,133 @@ class MockCollection:
             import uuid
             document_id = str(uuid.uuid4())
         if document_id not in self.documents:
-            # Create a new MockDocument with the specified ID
             self.documents[document_id] = MockDocument(document_id)
         return self.documents[document_id]
 
+    # Query-builder entry points — return a MockQuery so filters never
+    # mutate the collection itself (avoids cross-query contamination).
     def where(self, field, op, value):
-        # For simplicity, we'll ignore where in mock and return all documents
-        # In a more advanced mock, we could store filters
-        return self
+        return MockQuery(self).where(field, op, value)
+
+    def order_by(self, field, direction=None):
+        return MockQuery(self).order_by(field, direction)
 
     def limit(self, limit_val):
-        # For simplicity, we'll ignore limit in mock
-        # In a more advanced mock, we could store the limit
-        return self
+        return MockQuery(self).limit(limit_val)
 
     def offset(self, offset_val):
-        # For simplicity, we'll ignore offset in mock
-        # In a more advanced mock, we could store the offset
+        return MockQuery(self).offset(offset_val)
+
+    def stream(self):
+        """Unfiltered stream — returns every document with data."""
+        return MockQuery(self).stream()
+
+
+class MockQuery:
+    """Accumulates where / order_by / limit / offset clauses and applies
+    them when stream() is called — mirrors the real Firestore Query API."""
+
+    def __init__(self, collection):
+        self._collection = collection
+        self._filters = []
+        self._orders = []
+        self._limit = None
+        self._offset = 0
+
+    # -- chainable builder methods ----------------------------------------
+
+    def where(self, field, op, value):
+        self._filters.append((field, op, value))
         return self
 
     def order_by(self, field, direction=None):
-        # For simplicity, we'll ignore order_by in mock
+        self._orders.append((field, direction))
         return self
 
+    def limit(self, limit_val):
+        self._limit = limit_val
+        return self
+
+    def offset(self, offset_val):
+        self._offset = offset_val
+        return self
+
+    # -- execution --------------------------------------------------------
+
     def stream(self):
-        # Return all documents as mock snapshots
         from types import SimpleNamespace
+
+        # 1. Collect documents that have data
+        candidates = [
+            (doc_id, doc)
+            for doc_id, doc in self._collection.documents.items()
+            if doc.data
+        ]
+
+        # 2. Apply filters
+        for field, op, value in self._filters:
+            filtered = []
+            for doc_id, doc in candidates:
+                doc_val = doc.data.get(field)
+                if op == '==':
+                    if doc_val == value:
+                        filtered.append((doc_id, doc))
+                elif op == '!=':
+                    if doc_val != value:
+                        filtered.append((doc_id, doc))
+                elif op == '>=':
+                    if doc_val is not None and doc_val >= value:
+                        filtered.append((doc_id, doc))
+                elif op == '<=':
+                    if doc_val is not None and doc_val <= value:
+                        filtered.append((doc_id, doc))
+                elif op == '>':
+                    if doc_val is not None and doc_val > value:
+                        filtered.append((doc_id, doc))
+                elif op == '<':
+                    if doc_val is not None and doc_val < value:
+                        filtered.append((doc_id, doc))
+                elif op == 'in':
+                    if doc_val in value:
+                        filtered.append((doc_id, doc))
+                elif op == 'array_contains':
+                    if isinstance(doc_val, list) and value in doc_val:
+                        filtered.append((doc_id, doc))
+                else:
+                    # Unknown operator — include the doc (lenient)
+                    filtered.append((doc_id, doc))
+            candidates = filtered
+
+        # 3. Apply ordering
+        for field, direction in reversed(self._orders):
+            desc = False
+            if direction is not None:
+                # Handle firestore.Query.DESCENDING (int 2) or string
+                if isinstance(direction, int):
+                    desc = direction != 1  # ASCENDING = 1
+                elif hasattr(direction, 'name'):
+                    desc = direction.name == 'DESCENDING'
+                elif isinstance(direction, str):
+                    desc = 'desc' in direction.lower()
+            candidates.sort(
+                key=lambda pair: pair[1].data.get(field) or '',
+                reverse=desc,
+            )
+
+        # 4. Apply offset & limit
+        if self._offset:
+            candidates = candidates[self._offset:]
+        if self._limit is not None:
+            candidates = candidates[:self._limit]
+
+        # 5. Build snapshots
         snapshots = []
-        for doc_id, doc in self.documents.items():
-            mock_snapshot = SimpleNamespace()
-            mock_snapshot.exists = bool(doc.data)
-            mock_snapshot.to_dict = lambda d=doc.data: d
-            mock_snapshot.id = doc_id
-            snapshots.append(mock_snapshot)
+        for doc_id, doc in candidates:
+            snap = SimpleNamespace()
+            snap.exists = True
+            snap.to_dict = (lambda d=doc.data: d)
+            snap.id = doc_id
+            snapshots.append(snap)
         return snapshots
 
 
@@ -109,13 +205,14 @@ class MockStorageBucket:
 
     def blob(self, path):
         if path not in self.objects:
-            self.objects[path] = MockBlob(path)
+            self.objects[path] = MockBlob(path, self)
         return self.objects[path]
 
 
 class MockBlob:
-    def __init__(self, path):
+    def __init__(self, path, bucket=None):
         self.path = path
+        self.bucket = bucket
         self.content = None
 
     def upload_from_string(self, data, content_type=None):
@@ -128,11 +225,11 @@ class MockBlob:
     def download_as_string(self):
         return self.content or b""
 
-    def generate_signed_url(self, method, expiration, headers=None):
+    def generate_signed_url(self, expiration=None, method='GET', **kwargs):
         # Return a mock signed URL
         return f"https://storage.mock/{self.path}?signed=true"
 
     def delete(self):
         # Mock delete
-        if self.path in self.objects:
-            del self.objects[self.path]
+        if self.bucket and self.path in self.bucket.objects:
+            del self.bucket.objects[self.path]
